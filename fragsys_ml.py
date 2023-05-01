@@ -125,11 +125,11 @@ def plot_acc(hist_df):
     sns.lineplot(x = list(range(n_epochs)), y = hist_df["val_accuracy"], c = "orange", ax = ax2)#, label = "val_accuracy 11")
 
 def randomise(df, seed1):
-	"""
-	randomises rows and index of a dataframe
-	using two different seeds so the table index 
-	corresponds to random rows
-	"""
+    """
+    randomises rows and index of a dataframe
+    using two different seeds so the table index 
+    corresponds to random rows
+    """
     seed2 = seed1 + 1
     df_rand = df.sample(frac = 1, random_state = seed1)
     random.seed(seed2)
@@ -177,10 +177,10 @@ def get_confidences_df(preds_l, round_preds_l, vals_l):
     return conf_df, conf_df_sum
 
 def plot_conf_acc_cov(conf_df_sum):
-	"""
-	plots confidence vs coverage and accuracy
-	for a deep neural network
-	"""
+    """
+    plots confidence vs coverage and accuracy
+    for a deep neural network
+    """
     # create figure and axis objects with subplots()
     fig, ax = plt.subplots(figsize=(5, 5), dpi=100)
     # make a plot
