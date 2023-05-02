@@ -104,25 +104,29 @@ def load_pickle(f_in):
         data = pickle.load(f)
     return data
 
-def plot_loss(hist_df):
+def plot_loss(hist_df, epoch_stop = None):
     """
     customised lineplot function to plot
     training loss and validation loss from    
     an artificial neural network training
     """
     n_epochs = len(hist_df)
-    ax1 = sns.lineplot(x = list(range(n_epochs)), y = hist_df["loss"], c = "royalblue")#, label = "loss 11")
-    sns.lineplot(x = list(range(n_epochs)), y = hist_df["val_loss"], c = "orange", ax = ax1)#, label = "val_loss 11")
+    ax1 = sns.lineplot(x = list(range(n_epochs)), y = hist_df["loss"], c = "royalblue")
+    sns.lineplot(x = list(range(n_epochs)), y = hist_df["val_loss"], c = "orange", ax = ax1)
+    if epoch_stop != None:
+        plt.axvline(x = epoch_stop, linestyle = "--", color = "red", linewidth = 1.5)
 
-def plot_acc(hist_df):
+def plot_acc(hist_df, epoch_stop = None):
     """
     customised lineplot function to plot
     training accuracy and validation accuracy from    
     an artificial neural network training
     """
     n_epochs = len(hist_df)
-    ax2 = sns.lineplot(x = list(range(n_epochs)), y = hist_df["accuracy"], c = "royalblue")#, label = "accuracy 11")
-    sns.lineplot(x = list(range(n_epochs)), y = hist_df["val_accuracy"], c = "orange", ax = ax2)#, label = "val_accuracy 11")
+    ax2 = sns.lineplot(x = list(range(n_epochs)), y = hist_df["accuracy"], c = "royalblue")
+    sns.lineplot(x = list(range(n_epochs)), y = hist_df["val_accuracy"], c = "orange", ax = ax2)
+    if epoch_stop != None:
+        plt.axvline(x = epoch_stop, linestyle = "--", color = "red", linewidth = 1.5)
 
 def randomise(df, seed1):
     """
@@ -179,7 +183,7 @@ def get_confidences_df(preds_l, round_preds_l, vals_l):
 def plot_conf_acc_cov(conf_df_sum):
     """
     plots confidence vs coverage and accuracy
-    for a deep neural network
+    for the cross-validation of a neural network
     """
     # create figure and axis objects with subplots()
     fig, ax = plt.subplots(figsize=(5, 5), dpi=100)
@@ -210,5 +214,31 @@ def plot_conf_acc_cov(conf_df_sum):
     #plt.legend()
     plt.xticks(range(0,11))
     plt.show()
+
+def get_confidences_df_blind(preds, round_preds, vals):
+    """
+    plots confidence vs coverage and accuracy
+    for the test set prediction of a neural network
+    """
+    confs = []
+    for row in preds:
+        row = sorted(list(row), reverse = True)
+        confidence = int(10*(row[0] - row[1]))
+        confs.append(confidence)
+        
+    conf_df = pd.DataFrame(list(zip(confs, list(vals), list(round_preds))), columns = ["conf", "val", "pred"])
+    
+    un_confs = sorted(conf_df.conf.unique().tolist())
+    covs = []
+    accs = []
+    for un_conf in un_confs:
+        confi_df = conf_df[conf_df.conf >= un_conf]
+        covs.append(len(confi_df)/len(conf_df))
+        p_correct = len(confi_df[confi_df.val == confi_df.pred])/len(confi_df)
+        accs.append(p_correct)
+    
+    conf_df_sum = pd.DataFrame(list(zip(un_confs, covs, accs)), columns = ["conf", "cov", "acc"])
+    
+    return conf_df, conf_df_sum
 
 ### the end ###
