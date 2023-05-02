@@ -15,6 +15,7 @@ import pandas as pd
 import seaborn as sns
 from PIL import Image
 from scipy import stats
+from pathlib import Path
 from color_library import *
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
