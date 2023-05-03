@@ -435,6 +435,4 @@ def main(main_dir, prot, input_df):
 
     print("Fragsys has finished running for {}!".format(prot))
 
-    return
-
 ### THE END ###

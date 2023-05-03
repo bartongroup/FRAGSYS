@@ -1129,7 +1129,7 @@ def get_and_format_shenkin(shenkin, prot_cols, out = None):
     """
     DOC
     """
-    shenkin_filt = shenkin[shenkin.col.isin(prot_cols)]
+    shenkin_filt = shenkin[shenkin.col.isin(prot_cols)]#.copy()
     shenkin_filt.index = range(1, len(shenkin_filt) + 1) # CONTAINS SHENKIN SCORE, OCCUPANCY/GAP PROPORTION OF CONSENSUS COLUMNS
     min_shenkin = min(shenkin_filt.shenkin)
     max_shenkin = max(shenkin_filt.shenkin)
