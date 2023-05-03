@@ -1,50 +1,47 @@
-# ## IMPORTS ### need this
+### IMPORTS ###
 
 import os
 import re
-import math
-import shutil
-import pandas as pd
-import numpy as np
-import subprocess
-import statistics
-import configparser
-import importlib
-import scipy.stats as stats
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-import seaborn as sns
-from sklearn.cluster import AgglomerativeClustering, DBSCAN
-import scipy
-from scipy import cluster
-from scipy.spatial.distance import squareform, pdist
 import Bio
-import prointvar
+import math
+import scipy
+import shutil
 import Bio.SeqIO
+import importlib
+import prointvar
+import statistics
+import subprocess
 import Bio.AlignIO
+import numpy as np
+import configparser
+import pandas as pd
+import seaborn as sns
 from Bio.Seq import Seq
 from Bio import pairwise2
-importlib.reload(prointvar)
-from prointvar.config import config as cfg
+from scipy import cluster
+from color_library import *
+import varalign.alignments
+import scipy.stats as stats
+import varalign.align_variants
+import matplotlib.pyplot as plt
 from prointvar.pdbx import PDBXreader
 from prointvar.pdbx import PDBXwriter
-from prointvar.dssp import DSSPrunner, DSSPreader
-from prointvar.fetchers import download_structure_from_pdbe
-from prointvar.fetchers import download_sifts_from_ebi 
+import matplotlib.patches as mpatches
 from prointvar.sifts import SIFTSreader
+from prointvar.config import config as cfg
+from prointvar.dssp import DSSPrunner, DSSPreader
+from scipy.spatial.distance import squareform, pdist
+from prointvar.fetchers import download_sifts_from_ebi
+from prointvar.fetchers import download_structure_from_pdbe
 
-import varalign.align_variants
-import varalign.alignments
-
-from color_library import *
-
-# ## DICTIONARIES AND LISTS ###
+### DICTIONARIES AND LISTS ###
 
 arpeggio_suffixes = [
         "atomtypes", "bs_contacts", "contacts", "specific.sift", 
         "sift","specific.siftmatch", "siftmatch", "specific.polarmatch",
         "polarmatch", "ri", "rings", "ari", "amri", "amam", "residue_sifts"
-    ]
+]
+
 pdb_clean_suffixes = ["break_residues", "breaks"]
 
 simple_ions = [
@@ -84,15 +81,9 @@ aa_code = {
         "THR" : 'T', "VAL" : 'V', "TRP" : 'W', "TYR" : 'Y',
         "PYL" : 'O', "SEC" : 'U', "HYP" : 'P', "CSO" : 'C', # WEIRD ONES
         "SUI" : 'D',
-    }
-### HYP:   HYDROXYPROLINE  --> PRO --> P
-### CSO: S-HYDROXYCYSTEINE --> CYS --> C
-### CSP: S-PHOSPHOCYSTEINE
-### CSD: 3-SULFINOALANINE
-### OCS: CYSTEINESULFONIC ACID
-### SUI: (3-AMINO-2,5-DIOXO-1-PYRROLIDINYL)ACETIC ACID (ASP-GLY)
+}
 
-# ## CONFIG FILE READING AND VARIABLE SAVING ###
+### CONFIG FILE READING AND VARIABLE SAVING ###
 
 config = configparser.ConfigParser()
 config.read("fragsys_config.txt")
@@ -112,7 +103,261 @@ oc_metric = config["clustering"].get("oc_metric")
 oc_method = config["clustering"].get("oc_method")
 mes_sig_t = float(config["other"].get("mes_sig_t"))
 
-# ## STAMP SUPERIMPOSITION CODE ###
+### PRE-PROCESSING DATA CODE ###
+
+def setup_fragsys_start(main_dir, prot, df):
+    """
+    given a main directory, protein accession and structures dataframe,
+    downloads all biological assemblies of such structures if they have
+    not already been downloaded and classified in subdirectories
+    """
+    wd = os.path.join(main_dir, prot)
+    unsupp_cifs_dir = os.path.join(wd, "unsupp_cifs")
+    if not os.path.isdir(wd):
+        os.mkdir(wd)
+    else:
+        pass
+    if not os.path.isdir(unsupp_cifs_dir):
+        os.mkdir(unsupp_cifs_dir)
+    else:
+        pass
+    prot_df = df[df.entry_uniprot_accession == prot]
+    prot_strucs = prot_df.pdb_id.unique().tolist()
+    struc_files = []
+    unsupp_cifs_subirs = os.listdir(unsupp_cifs_dir)
+    if len(unsupp_cifs_subirs) == 0: #it's empty, need to download
+        pass
+    else: #not empty
+        for element in unsupp_cifs_subirs:
+            element_path = os.path.join(unsupp_cifs_dir, element)
+            if os.path.isfile(element_path):
+                pass
+            elif os.path.isdir(element_path):
+                element_files = os.listdir(element_path)
+                for element_file in element_files:
+                    prot_strucs.remove(element_file[:4])
+                    unsupp_file_path = os.path.join(unsupp_cifs_dir, element_file)
+                    if os.path.isfile(unsupp_file_path):
+                        os.remove(unsupp_file_path)
+                
+    for struc in prot_strucs: #only those that are downloaded or have yet to be (not those classified already)
+        input_struc = os.path.join(cfg.db_root, cfg.db_pdbx, struc + "_bio.cif")
+        input_struc_moved = os.path.join(unsupp_cifs_dir, os.path.basename(input_struc))
+        if os.path.isfile(input_struc) or os.path.isfile(input_struc_moved):
+            pass
+        else:
+            download_structure_from_pdbe(struc, bio = True) # downloads only files missing
+        struc_files.append(input_struc)
+        
+    for file in struc_files:
+        if os.path.isfile(file):
+            shutil.move(file, os.path.join(unsupp_cifs_dir, os.path.basename(file))) #moves downloaded cif files
+            
+    pdbx_files = os.listdir(os.path.join(cfg.db_root, cfg.db_pdbx))
+    if len(pdbx_files) != 0:
+        for pdbx in pdbx_files:
+            os.remove(os.path.join(cfg.db_root, cfg.db_pdbx, pdbx)) # removes any leftover files?
+
+def setup_dirs(dirs):
+    """
+    sets up the directories for the program to tun
+    """
+    for dirr in dirs:
+        if os.path.isdir(dirr):
+            continue
+        else:
+            os.mkdir(dirr)
+
+def classify_pdbs(prot, main_dir, h = 0.2, show = False):
+    """
+    Classifies a group of cif files into different
+    folders according to their amino acid sequence
+    """
+    z, un_seqs, seqs_df = cluster_protein_sequences(prot, main_dir, h, show)
+    
+    seqs_df = assign_seqs_clusters(z, un_seqs, seqs_df)
+    
+    create_cluster_dirs(main_dir, prot, seqs_df)
+
+def cluster_protein_sequences(prot, main_dir, h = 0.2, show = False):
+    """
+    Extracts sequences from PDB structures of a certain UniProt accession,
+    calculates distances between them, genereates matrix, dendrogram and
+    clustermap.
+    """
+    wd = os.path.join(main_dir, prot)
+    unsupp_cifs_dir = os.path.join(wd, "unsupp_cifs")
+    cif_paths = []
+    for file in os.listdir(unsupp_cifs_dir):
+        if os.path.isfile(os.path.join(unsupp_cifs_dir, file)): #cifs without classifying
+            cif_paths.append(os.path.join(unsupp_cifs_dir, file))
+        elif os.path.isdir(os.path.join(unsupp_cifs_dir, file)): #checking for directories, might have classified PDBs already
+            for file2 in os.listdir(os.path.join(unsupp_cifs_dir, file)):
+                cif_paths.append(os.path.join(unsupp_cifs_dir, file, file2))
+        else:
+            pass
+    seqs_df_path = os.path.join(wd, "{}_seqs_df.csv".format(prot))
+    if os.path.isfile(seqs_df_path):
+        seqs_df = pd.read_csv(seqs_df_path)
+    else:
+        seqs = {}
+        for cif_path in cif_paths:
+            seq = get_seq_from_pdb(cif_path, pdb_fmt = "mmcif")
+            cif_id = cif_path.split("/")[-1][:4]
+            seqs[cif_id] = seq
+        seqs_df = pd.DataFrame(list(seqs.items()), index = None, columns = ["pdb_id", "seq"])
+        seqs_df.to_csv(seqs_df_path, index = False)
+        
+    un_seqs = seqs_df.drop_duplicates("seq").seq.tolist()
+    msa_df_out = os.path.join(wd, "{}_msa_dists.csv".format(prot))
+    if os.path.isfile(msa_df_out):
+        msa_df_norm = pd.read_csv(msa_df_out)
+    else:
+        msa_mat_norm = get_msa_matrix(un_seqs)
+        msa_df_norm = pd.DataFrame(msa_mat_norm)
+        msa_df_norm.to_csv(msa_df_out, index = False)
+    if len(un_seqs) == 1:
+        return np.array([]), un_seqs, seqs_df
+    else:
+        pass
+        
+    plot_clustermap(msa_df_norm, prot, wd, show)
+    
+    z = scipy.cluster.hierarchy.linkage(scipy.spatial.distance.squareform(msa_df_norm), method = "complete")
+    
+    plot_dendrogram(z, msa_df_norm, wd, prot, h, show)
+    
+    return z, un_seqs, seqs_df
+
+def get_msa_matrix(seqs_list, norm = True):
+    """
+    Given a list of sequences, calculates all pairwise global sequence alignments
+    and from the scores, generates a distance from 0-1.
+    """
+    scores = {i: {} for i in range(len(seqs_list))}
+    for i in range(len(seqs_list)):
+        scores[i][i] = pairwise2.align.globalxx(seqs_list[i], seqs_list[i])[0][2]
+        for j in range(i+1, len(seqs_list)):
+            scores[i][j] = pairwise2.align.globalxx(seqs_list[i], seqs_list[j])[0][2]
+            scores[j][i] = scores[i][j]
+    if norm == True:
+        scores_norm = {i: {} for i in range(len(seqs_list))}
+        for i in range(len(seqs_list)):
+            scores_norm[i][i] = abs(scores[i][i] - scores[i][i])/scores[i][i]
+            for j in range(i+1, len(seqs_list)):
+                scores_norm[i][j] = abs(scores[i][j] - scores[i][i])/scores[i][i]
+                scores_norm[j][i] = abs(scores[j][i] - scores[i][i])/scores[i][i]
+        return scores_norm
+    else:
+        return scores
+
+def plot_clustermap(msa_df_norm, prot, wd, show = False):
+    """
+    Plots a clustermap given a matrix of distances between sequences
+    """
+    plt.rcParams['figure.dpi'] = 300
+    g = sns.clustermap(
+        msa_df_norm, #square = True,
+        cmap = "viridis_r", linewidths = 1, linecolor = "k",
+        vmin = 0, vmax = 1
+    )
+    
+    fig_out = os.path.join(wd, "{}_unique_seqs_clustermap.png".format(prot))
+    
+    if os.path.isfile(fig_out):
+        pass
+    
+    else:
+        plt.savefig(fig_out)
+        
+    if show == True:
+        plt.show()
+    plt.close()
+
+def plot_dendrogram(z, msa_df_norm, wd, prot, h, show = False):
+    """
+    Plots a dendrogram of the complete linkage hierarchical clustering
+    calculated from the matrix of distances between sequences
+    """
+    plt.figure(figsize = (7.5, 4), dpi = 300)
+
+    d = scipy.cluster.hierarchy.dendrogram(
+        z, labels = msa_df_norm.index, color_threshold = h
+    )
+    plt.title("Complete linkage clustering of unique sequences", fontsize = 15, pad = 15)
+    plt.xlabel("Unique sequence ID", fontsize = 10, labelpad = 10)
+    plt.ylabel("Alignment score distance", fontsize = 10, labelpad = 10)
+    plt.axhline(y = 0.2, linestyle = "--", color = "k", linewidth = 1)
+    fig_out = os.path.join(wd, "{}_unique_seqs_dendrogram.png".format(prot))
+    if os.path.isfile(fig_out):
+        pass
+    else:
+        plt.savefig(fig_out)
+    if show == True:
+        plt.show()
+    plt.close()
+
+def assign_seqs_clusters(z, unique_seqs, seqs_df, h = 0.2):
+    """
+    Given a dendrogram and group of sequences,
+    assigns a cluster ID to those sequences
+    """
+    if z.size == 0:
+        print("This condition is being met")  # only one sequence
+        seqs_df["seq_id"] = [0 for i in range(len(seqs_df))]
+        seqs_df["cluster_id"] = [0 for i in range(len(seqs_df))]
+    else:
+        cutree = scipy.cluster.hierarchy.cut_tree(z, height = h) # clusters coordinates
+        cluster_ids = [int(cut) for cut in cutree]
+        un_seqs_dict = {el: i for i, el in enumerate(unique_seqs)}
+        cluster_id_dict = {i: el for i, el in enumerate(cluster_ids)}
+        seqs_df["seq_id"] = seqs_df.seq.map(un_seqs_dict)
+        seqs_df["cluster_id"] = seqs_df.seq_id.map(cluster_id_dict)
+    return seqs_df
+
+def create_cluster_dirs(main_dir, prot, seqs_df):
+    """
+    Once sequences have been assigned a cluster ID, the .cif files
+    are divided into subdirectories
+    """
+    unsupp_cifs_dir = os.path.join(main_dir, prot, "unsupp_cifs")
+    cluster_ids = sorted([str(cluster_id) for cluster_id in seqs_df.cluster_id.unique().tolist()])
+    unsupp_files = sorted(os.listdir(unsupp_cifs_dir))
+    if unsupp_files == cluster_ids:
+        return
+    for cluster_id in cluster_ids:
+        cluster_unsupp_dir = os.path.join(unsupp_cifs_dir, str(cluster_id))
+        if not os.path.isdir(cluster_unsupp_dir):
+            os.mkdir(cluster_unsupp_dir)
+        cluster_pdbs = seqs_df[seqs_df.cluster_id == int(cluster_id)].pdb_id.tolist()
+        cluster_pdb_paths = ["{}_bio.cif".format(cluster_pdb) for cluster_pdb in cluster_pdbs]
+        for cluster_pdb_path in cluster_pdb_paths:
+            if os.path.isfile(os.path.join(unsupp_cifs_dir, cluster_pdb_path)):
+                shutil.move(
+                os.path.join(unsupp_cifs_dir, cluster_pdb_path),
+                os.path.join(cluster_unsupp_dir, cluster_pdb_path)
+                )
+
+def get_swissprot(): 
+    """
+    Retrieves sequences and their data from Swiss-Prot
+
+    :param db: absolute path to a fasta file containing sequences, Swiss-Prot database by default
+    :type db: str
+    :returns: dictionary containing the sequence id, description and sequence for all proteins in Swiss-Prot
+    :rtpe: dict
+    """
+    swissprot_dict = Bio.SeqIO.parse(swissprot, "fasta")
+    proteins = {}
+    for protein in swissprot_dict:
+        acc = protein.id.split("|")[1]
+        proteins[acc] = {}
+        proteins[acc]["id"] = protein.id
+        proteins[acc]["desc"] = protein.description
+        proteins[acc]["seq"] = protein.seq
+    return proteins
+
+### STAMP SUPERIMPOSITION CODE ###
 
 def cif2pdb(cif_in, pdb_out):
     """
@@ -122,6 +367,16 @@ def cif2pdb(cif_in, pdb_out):
     w = PDBXwriter(outputfile = pdb_out)
     id_equiv_dict = w.run(cif_df, format_type = "pdb", category = 'auth')
     return id_equiv_dict
+
+def get_chain_dict(cif_path):
+    """
+    Creates an equivalence dict between asymemtric unit chain IDs and biological assembly chain IDs
+    """
+    cif_df = PDBXreader(inputfile = cif_path).atoms(format_type = "mmcif", excluded=())
+    orig_chains = cif_df[cif_df.group_PDB == "ATOM"][['orig_auth_asym_id', 'auth_asym_id']].drop_duplicates().orig_auth_asym_id.tolist()
+    new_chains = cif_df[cif_df.group_PDB == "ATOM"][['orig_auth_asym_id', 'auth_asym_id']].drop_duplicates().auth_asym_id.tolist()
+    chain_dict = {new_chains[i]: orig_chains[i] for i in range(len(orig_chains))}
+    return chain_dict
 
 def generate_domains(pdbs_dir, domains_out, roi = "ALL"):
     """
@@ -192,80 +447,7 @@ def move_stamp_output(wd, prefix, stamp_out_dir):
     if os.path.isfile(doms_from):
         shutil.move(doms_from, doms_to)
 
-
-# ## PRE-PROCESSING DATA CODE ###
-
-def setup_fragsys_start(main_dir, prot, df):
-    """
-    given a main directory, protein accession and structures dataframe,
-    downloads all biological assemblies of such structures if they have
-    not already been downloaded and classified in subdirectories
-    """
-    wd = os.path.join(main_dir, prot)
-    unsupp_cifs_dir = os.path.join(wd, "unsupp_cifs")
-    if not os.path.isdir(wd):
-        os.mkdir(wd)
-    else:
-        #print("Directory already exists!")
-        pass
-    if not os.path.isdir(unsupp_cifs_dir):
-        os.mkdir(unsupp_cifs_dir)
-    else:
-        #print("Directory already exists!")
-        pass
-    prot_df = df[df.entry_uniprot_accession == prot]
-    prot_strucs = prot_df.pdb_id.unique().tolist()
-    struc_files = []
-    unsupp_cifs_subirs = os.listdir(unsupp_cifs_dir)
-    if len(unsupp_cifs_subirs) == 0: #it's empty, need to download
-        pass
-    else: #not empty
-        for element in unsupp_cifs_subirs:
-            element_path = os.path.join(unsupp_cifs_dir, element)
-            if os.path.isfile(element_path):
-                #print("{} is a file!".format(element_path))
-                pass
-            elif os.path.isdir(element_path):
-                element_files = os.listdir(element_path)
-                #print("{} is a directory!".format(element_path))
-                #print(element_files)
-                for element_file in element_files:
-                    prot_strucs.remove(element_file[:4])
-                    unsupp_file_path = os.path.join(unsupp_cifs_dir, element_file)
-                    if os.path.isfile(unsupp_file_path):
-                        os.remove(unsupp_file_path)
-                        #print("{} was removed!".format(element_file)) # removes file if both downloaded and already classified
-                #print(prot_strucs)
-                
-    for struc in prot_strucs: #only those that are downloaded or have yet to be (not those classified already)
-        input_struc = os.path.join(cfg.db_root, cfg.db_pdbx, struc + "_bio.cif")
-        input_struc_moved = os.path.join(unsupp_cifs_dir, os.path.basename(input_struc))
-        if os.path.isfile(input_struc) or os.path.isfile(input_struc_moved):
-            pass
-        else:
-            download_structure_from_pdbe(struc, bio = True) # downloads only files missing
-        struc_files.append(input_struc)
-        
-    for file in struc_files:
-        if os.path.isfile(file):
-            shutil.move(file, os.path.join(unsupp_cifs_dir, os.path.basename(file))) #moves downloaded cif files
-            
-    pdbx_files = os.listdir(os.path.join(cfg.db_root, cfg.db_pdbx))
-    if len(pdbx_files) != 0:
-        for pdbx in pdbx_files:
-            os.remove(os.path.join(cfg.db_root, cfg.db_pdbx, pdbx)) # removes any leftover files?
-    #print("Directory has been setup for FragSys to run!")
-
-def setup_dirs(dirs):
-    """
-    sets up the directories for the program to tun
-    """
-    for dirr in dirs:
-        if os.path.isdir(dirr):
-            continue
-        else:
-            os.mkdir(dirr)
-    #print("Directories are set up!")
+### DSSP + SIFTS + ARPEGGIO ###
 
 def get_lig_data(supp_pdbs_dir, ligs_df_path):
     """
@@ -276,7 +458,6 @@ def get_lig_data(supp_pdbs_dir, ligs_df_path):
     ligs_df = pd.DataFrame([])
     for struc in os.listdir(supp_pdbs_dir):
         struc_path = os.path.join(supp_pdbs_dir, struc)
-        #print(struc_path)
         df = PDBXreader(inputfile = struc_path).atoms(format_type = "pdb", excluded=())
         hetatm_df = df[df.group_PDB == "HETATM"]
         ligs = hetatm_df.label_comp_id.unique().tolist()
@@ -290,196 +471,59 @@ def get_lig_data(supp_pdbs_dir, ligs_df_path):
     ligs_df.to_csv(ligs_df_path, index = False)
     return ligs_df
 
-def get_msa_matrix(seqs_list, norm = True):
+def run_dssp(struc, supp_pdbs_dir, dssp_dir):
     """
-    Given a list of sequences, calculates all pairwise global sequence alignments
-    and from the scores, generates a distance from 0-1.
+    runs DSSP, saves and return resulting output dataframe
     """
-    scores = {i: {} for i in range(len(seqs_list))}
-    for i in range(len(seqs_list)):
-        scores[i][i] = pairwise2.align.globalxx(seqs_list[i], seqs_list[i])[0][2]
-        for j in range(i+1, len(seqs_list)):
-            scores[i][j] = pairwise2.align.globalxx(seqs_list[i], seqs_list[j])[0][2]
-            scores[j][i] = scores[i][j]
-    if norm == True:
-        scores_norm = {i: {} for i in range(len(seqs_list))}
-        for i in range(len(seqs_list)):
-            scores_norm[i][i] = abs(scores[i][i] - scores[i][i])/scores[i][i]
-            for j in range(i+1, len(seqs_list)):
-                scores_norm[i][j] = abs(scores[i][j] - scores[i][i])/scores[i][i]
-                scores_norm[j][i] = abs(scores[j][i] - scores[i][i])/scores[i][i]
-        return scores_norm
-    else:
-        return scores
+    dssp_csv = os.path.join(dssp_dir, "dssp_" + struc.replace("pdb", "csv")) # output csv filepath
+    dssp_out = os.path.join(dssp_dir, struc.replace("pdb", "dssp"))
+    struc_in = os.path.join(supp_pdbs_dir, struc)
+    DSSPrunner(inputfile = struc_in, outputfile = dssp_out).write()            # runs DSSP
+    dssp_data = DSSPreader(inputfile = dssp_out).read()            # reads DSSP output
+    dssp_data = dssp_data.rename(index = str, columns = {"RES": "PDB_ResNum"})
+    dssp_data.PDB_ResNum = dssp_data.PDB_ResNum.astype(str)
+    dssp_cols = ["PDB_ResNum", "SS", "ACC", "KAPPA", "ALPHA", "PHI", "PSI", "RSA"]    # selects subset of columns
+    dssp_data.to_csv(dssp_csv, index = False)
+    return dssp_data[dssp_cols]
 
-def plot_clustermap(msa_df_norm, prot, wd, show = False):
+def process_sifts_data(input_sifts, sifts_dir, pdb_id):
     """
-    Plots a clustermap given a matrix of distances between sequences
+    processes SIFTS table, saves and returns the processed tables
     """
-    plt.rcParams['figure.dpi'] = 300
-    g = sns.clustermap(
-        msa_df_norm, #square = True,
-        cmap = "viridis_r", linewidths = 1, linecolor = "k",
-        vmin = 0, vmax = 1
-    )
-    
-    fig_out = os.path.join(wd, "{}_unique_seqs_clustermap.png".format(prot))
-    
-    if os.path.isfile(fig_out):
-        #print("Fig exists already!")
+    sifts_data = SIFTSreader(inputfile = input_sifts).read() # read sifts data
+    sifts_mapping = sifts_data[[
+            "UniProt_dbResNum", "UniProt_dbResName", "PDB_dbResName",
+            "PDB_dbResNum", "PDB_dbChainId"
+        ]] # subsetting sifts table
+        
+    sifts_mapping = sifts_mapping.rename(index = str, columns = {
+            "UniProt_dbResNum":"UniProt_ResNum", "UniProt_dbResName":"UniProt_ResName",
+            "PDB_dbResName":"PDB_ResName", "PDB_dbResNum":"PDB_ResNum",
+            "PDB_dbChainId":"PDB_ChainID"
+        }) # renaming table columns
+    try:
+        sifts_mapping = sifts_mapping[sifts_mapping.UniProt_ResNum != "null"]
+    except:
+        pass
+    try:
+        sifts_mapping = sifts_mapping[~sifts_mapping.UniProt_ResNum.isnull()]
+    except:
         pass
     
-    else:
-        plt.savefig(fig_out)
-        
-    if show == True:
-        plt.show()
-    plt.close()
-
-def plot_dendrogram(z, msa_df_norm, wd, prot, h, show = False):
-    """
-    Plots a dendrogram of the complete linkage hierarchical clustering
-    calculated from the matrix of distances between sequences
-    """
-    plt.figure(figsize = (7.5, 4), dpi = 300)
-
-    d = scipy.cluster.hierarchy.dendrogram(
-        z, labels = msa_df_norm.index, color_threshold = h
-    )
-    plt.title("Complete linkage clustering of unique sequences", fontsize = 15, pad = 15)
-    plt.xlabel("Unique sequence ID", fontsize = 10, labelpad = 10)
-    plt.ylabel("Alignment score distance", fontsize = 10, labelpad = 10)
-    plt.axhline(y = 0.2, linestyle = "--", color = "k", linewidth = 1)
-    fig_out = os.path.join(wd, "{}_unique_seqs_dendrogram.png".format(prot))
-    if os.path.isfile(fig_out):
-        #print("Fig exists already!")
-        pass
-    else:
-        plt.savefig(fig_out)
-    if show == True:
-        plt.show()
-    plt.close()
-
-def cluster_protein_sequences(prot, main_dir, h = 0.2, show = False):
-    """
-    Extracts sequences from PDB structures of a certain UniProt accession,
-    calculates distances between them, genereates matrix, dendrogram and
-    clustermap.
-    """
-    wd = os.path.join(main_dir, prot)
-    unsupp_cifs_dir = os.path.join(wd, "unsupp_cifs")
-    cif_paths = []
-    for file in os.listdir(unsupp_cifs_dir):
-        if os.path.isfile(os.path.join(unsupp_cifs_dir, file)): #cifs without classifying
-            cif_paths.append(os.path.join(unsupp_cifs_dir, file))
-        elif os.path.isdir(os.path.join(unsupp_cifs_dir, file)): #checkin for diresctories, might have classified PDBs already
-            for file2 in os.listdir(os.path.join(unsupp_cifs_dir, file)):
-                cif_paths.append(os.path.join(unsupp_cifs_dir, file, file2))
-        else:
-            pass
-    seqs_df_path = os.path.join(wd, "{}_seqs_df.csv".format(prot))
-    if os.path.isfile(seqs_df_path):
-        seqs_df = pd.read_csv(seqs_df_path)
-        #print("Seqs df is being read!")
-    else:
-        seqs = {}
-        for cif_path in cif_paths:
-            seq = get_seq_from_pdb(cif_path, pdb_fmt = "mmcif")
-            cif_id = cif_path.split("/")[-1][:4]
-            seqs[cif_id] = seq
-        seqs_df = pd.DataFrame(list(seqs.items()), index = None, columns = ["pdb_id", "seq"])
-        seqs_df.to_csv(seqs_df_path, index = False)
-        
-    un_seqs = seqs_df.drop_duplicates("seq").seq.tolist()
-    msa_df_out = os.path.join(wd, "{}_msa_dists.csv".format(prot))
-    if os.path.isfile(msa_df_out):
-        msa_df_norm = pd.read_csv(msa_df_out)
-        #print("Msa df is being read!")
-    else:
-        msa_mat_norm = get_msa_matrix(un_seqs)
-        msa_df_norm = pd.DataFrame(msa_mat_norm)
-        msa_df_norm.to_csv(msa_df_out, index = False)
-    if len(un_seqs) == 1:
-        #print("Only one sequence for {}".format(prot))
-        return np.array([]), un_seqs, seqs_df
-    else:
-        #print("{} sequences for {}".format(len(un_seqs), prot))
-        pass
-        
-    plot_clustermap(msa_df_norm, prot, wd, show)
+    sifts_mapping = sifts_mapping[sifts_mapping.PDB_ResNum != "null"]
+    sifts_mapping.UniProt_ResNum =  sifts_mapping.UniProt_ResNum.astype(int)
+    sifts_mapping.PDB_ResNum =  sifts_mapping.PDB_ResNum.astype(str)
     
-    z = scipy.cluster.hierarchy.linkage(scipy.spatial.distance.squareform(msa_df_norm), method = "complete")
+    sifts_csv = os.path.join(sifts_dir, "sifts_" + pdb_id + ".csv") # sifts output csv file
+    sifts_data.to_csv(sifts_csv, index = False) # write sifts table to csv
     
-    plot_dendrogram(z, msa_df_norm, wd, prot, h, show)
+    sifts_csv2 = os.path.join(sifts_dir, "sifts_mapping_" + pdb_id + ".csv")
+    sifts_mapping.to_csv(sifts_csv2, index = False)
     
-    return z, un_seqs, seqs_df
+    shutil.move(input_sifts, os.path.join(sifts_dir, os.path.basename(input_sifts)))
+    return sifts_data, sifts_mapping
 
-def assign_seqs_clusters(z, unique_seqs, seqs_df, h = 0.2):
-    """
-    Given a dendrogram and group of sequences,
-    assigns a cluster ID to those sequences
-    """
-    if z.size == 0:
-        print("This condition is being met")  # only one sequence
-        seqs_df["seq_id"] = [0 for i in range(len(seqs_df))]
-        seqs_df["cluster_id"] = [0 for i in range(len(seqs_df))]
-    else:
-        cutree = scipy.cluster.hierarchy.cut_tree(z, height = h) # clusters coordinates
-        cluster_ids = [int(cut) for cut in cutree]
-        un_seqs_dict = {el: i for i, el in enumerate(unique_seqs)}
-        cluster_id_dict = {i: el for i, el in enumerate(cluster_ids)}
-        seqs_df["seq_id"] = seqs_df.seq.map(un_seqs_dict)
-        seqs_df["cluster_id"] = seqs_df.seq_id.map(cluster_id_dict)
-    return seqs_df
-
-def create_cluster_dirs(main_dir, prot, seqs_df):
-    """
-    Once sequences have been assigned a cluster ID, the .cif files
-    are divided into subdirectories
-    """
-    unsupp_cifs_dir = os.path.join(main_dir, prot, "unsupp_cifs")
-    cluster_ids = sorted([str(cluster_id) for cluster_id in seqs_df.cluster_id.unique().tolist()])
-    unsupp_files = sorted(os.listdir(unsupp_cifs_dir))
-    #print(cluster_ids)
-    if unsupp_files == cluster_ids:
-        #print("PDBs have already been classified!")
-        return
-    for cluster_id in cluster_ids:
-        cluster_unsupp_dir = os.path.join(unsupp_cifs_dir, str(cluster_id))
-        if not os.path.isdir(cluster_unsupp_dir):
-            os.mkdir(cluster_unsupp_dir)
-        cluster_pdbs = seqs_df[seqs_df.cluster_id == int(cluster_id)].pdb_id.tolist()
-        cluster_pdb_paths = ["{}_bio.cif".format(cluster_pdb) for cluster_pdb in cluster_pdbs]
-        for cluster_pdb_path in cluster_pdb_paths:
-            if os.path.isfile(os.path.join(unsupp_cifs_dir, cluster_pdb_path)):
-                shutil.move(
-                os.path.join(unsupp_cifs_dir, cluster_pdb_path),
-                os.path.join(cluster_unsupp_dir, cluster_pdb_path)
-                )
-    #print("Sequence clusters have been defined and directories created!")
-
-def classify_pdbs(prot, main_dir, h = 0.2, show = False):
-    """
-    Classifies a group of cif files into different
-    folders according to their amino acid sequence
-    """
-    z, un_seqs, seqs_df = cluster_protein_sequences(prot, main_dir, h, show)
-    
-    seqs_df = assign_seqs_clusters(z, un_seqs, seqs_df)
-    
-    create_cluster_dirs(main_dir, prot, seqs_df)
-
-def get_chain_dict(cif_path):
-    """
-    Creates an equivalence dict between asymemtric unit chain IDs and biological assembly chain IDs
-    """
-    cif_df = PDBXreader(inputfile = cif_path).atoms(format_type = "mmcif", excluded=())
-    orig_chains = cif_df[cif_df.group_PDB == "ATOM"][['orig_auth_asym_id', 'auth_asym_id']].drop_duplicates().orig_auth_asym_id.tolist()
-    new_chains = cif_df[cif_df.group_PDB == "ATOM"][['orig_auth_asym_id', 'auth_asym_id']].drop_duplicates().auth_asym_id.tolist()
-    chain_dict = {new_chains[i]: orig_chains[i] for i in range(len(orig_chains))}
-    return chain_dict
-
-# ## ARPEGGIO PART CODE ###
+### ARPEGGIO ###
 
 def run_clean_pdb(pdb_path):
     """
@@ -521,15 +565,11 @@ def move_arpeggio_output(wd, subdir, strucs, supp_pdbs_subdir, clean_pdbs_subdir
         for arpeggio_suff in arpeggio_suffixes:
             for the_lig in struc2ligs[struc]:
                 arpeggio_file_from_supp = os.path.join(supp_pdbs_subdir, struc[:-3] + "clean_{}".format(the_lig) + "." + arpeggio_suff)
-                #print(arpeggio_file_from_supp)
                 arpeggio_file_to = os.path.join(wd, "results/arpeggio/", subdir, struc[:-3] + "clean_{}".format(the_lig) + "." + arpeggio_suff)
                 arpeggio_file_from_clean = os.path.join(clean_pdbs_subdir, struc[:-3] + "clean_{}".format(the_lig) + "." + arpeggio_suff)
-                #arpeggio_file_to_clean = os.path.join(os.path.dirname(supp_pdbs_subdir), "results/arpeggio", clean_struc + "." + arpeggio_suff)
                 if os.path.isfile(arpeggio_file_from_supp):
-                    #print("This is being moved here!")
                     shutil.move(arpeggio_file_from_supp, arpeggio_file_to)
                 elif os.path.isfile(arpeggio_file_from_clean):
-                    #print("This is being moved there!")
                     shutil.move(arpeggio_file_from_clean, arpeggio_file_to)
         for pdb_clean_suff in pdb_clean_suffixes:
             pdb_clean_file_from = os.path.join(supp_pdbs_subdir, struc + "." + pdb_clean_suff)
@@ -538,7 +578,76 @@ def move_arpeggio_output(wd, subdir, strucs, supp_pdbs_subdir, clean_pdbs_subdir
                 shutil.move(pdb_clean_file_from, pdb_clean_file_to)
             elif os.path.isfile(os.path.join(wd, "results/pdb_clean", struc + "." + pdb_clean_suff)):
                 shutil.move(os.path.join(wd, "results/pdb_clean", struc + "." + pdb_clean_suff), pdb_clean_file_to)
-    #print("All files have been moved successfully!")
+
+def process_arpeggio(struc, all_ligs, clean_pdbs_dir, arpeggio_dir, sifts_dir, bio2asym_chain_dict, cif2pdb_chain_dict):
+    """
+    processes arpeggio output to generate the two tables that will
+    be used later in the analysis
+    """
+    lig_cons_splits = []
+    arpeggio_lig_conss = []
+        
+    for lig in all_ligs:
+        arpeggio_out_path_lig = os.path.join(arpeggio_dir, struc.replace("pdb", "clean_{}.bs_contacts".format(lig)))
+        
+        all_cons_lig = pd.read_table(arpeggio_out_path_lig, header = None)
+
+        lig_cons_split_lig = reformat_arpeggio(all_cons_lig)
+
+        lig_cons_split_lig = add_resnames_to_arpeggio_table(struc, clean_pdbs_dir, lig_cons_split_lig)
+
+        lig_cons_split_lig = ligand_to_atom2(lig_cons_split_lig, lig)
+        
+        lig_cons_split_lig["contact_type"] = lig_cons_split_lig.apply(lambda row: contact_type(row), axis = 1)
+
+        arpeggio_lig_cons_lig = lig_cons_split_lig.sort_values(by = ["Chain (Atom1)", "ResNum (Atom1)"])
+        arpeggio_lig_cons_lig = arpeggio_lig_cons_lig[["ResNum (Atom1)","Chain (Atom1)", 'ResName (Atom1)']] 
+        arpeggio_lig_cons_lig = arpeggio_lig_cons_lig.drop_duplicates(subset = ["ResNum (Atom1)", "Chain (Atom1)"])
+        arpeggio_lig_cons_lig = arpeggio_lig_cons_lig.rename(index = str, columns = {"ResNum (Atom1)": "PDB_ResNum", "Chain (Atom1)": "PDB_ChainID"}) 
+        arpeggio_lig_cons_lig = arpeggio_lig_cons_lig.astype({"PDB_ResNum": int})
+        
+        lig_cons_splits.append(lig_cons_split_lig)
+        arpeggio_lig_conss.append(arpeggio_lig_cons_lig)
+    
+    lig_cons_split = pd.concat(lig_cons_splits)
+    arpeggio_lig_cons = pd.concat(arpeggio_lig_conss)
+    
+    ########################### ADDED TO AVOID INCORRECT BS DEFINITION DUE TO PDB RESNUMS ###########################
+
+    pdb_id = struc[:4]
+    sifts_mapping = pd.read_csv(os.path.join(sifts_dir, "sifts_mapping_{}.csv".format(pdb_id)))
+
+    sifts_dict = {}
+    for chain, chain_df in sifts_mapping.groupby("PDB_ChainID"):
+        for i, row in chain_df.iterrows():
+            sifts_dict[(chain, str(row["PDB_ResNum"]))] = row["UniProt_ResNum"]
+    
+    sifts_dict = extend_sifts_mapping_dict(sifts_dict, bio2asym_chain_dict, cif2pdb_chain_dict)
+    
+    lig_cons_split['ResNum (Atom1)'] = lig_cons_split['ResNum (Atom1)'].astype(str)
+    arpeggio_lig_cons['PDB_ResNum'] = arpeggio_lig_cons['PDB_ResNum'].astype(str)
+    lig_cons_split["UniProt_Resnum"] = lig_cons_split.set_index(['Chain (Atom1)', 'ResNum (Atom1)']).index.map(sifts_dict.get)
+    arpeggio_lig_cons["UniProt_Resnum"] = arpeggio_lig_cons.set_index(['PDB_ChainID', 'PDB_ResNum']).index.map(sifts_dict.get)
+
+    ########################### ADDED TO AVOID INCORRECT BS DEFINITION DUE TO PDB RESNUMS ###########################
+
+    old_len1 = len(arpeggio_lig_cons)
+    old_len2 = len(lig_cons_split)
+    lig_cons_split = lig_cons_split[~lig_cons_split.UniProt_Resnum.isnull()]
+    arpeggio_lig_cons = arpeggio_lig_cons[~arpeggio_lig_cons.UniProt_Resnum.isnull()]
+    new_len1 = len(arpeggio_lig_cons)
+    new_len2 = len(lig_cons_split)
+    if new_len1 != old_len1:
+        print("WARNING!!! {} residues lacked mapping from PDB to UniProt at arpeggio_lig_cons for {}".format(new_len1-old_len1, pdb_id))
+    if new_len2 != old_len2:
+        print("WARNING!!! {} residues lacked mapping from PDB to UniProt at lig_cons_split for {}".format(new_len2-old_len2, pdb_id))
+
+    ########################### ADDED TO AVOID INCORRECT BS DEFINITION DUE TO LACKING MAPPING TO PDB RESNUMS ###########################
+
+    lig_cons_split.to_csv(os.path.join(arpeggio_dir,  "arpeggio_all_cons_split_" + struc[:4] + ".csv"), index = False)
+    arpeggio_lig_cons.to_csv(os.path.join(arpeggio_dir,  "arpeggio_lig_cons_" + struc[:4] + ".csv"), index = False)
+    
+    return lig_cons_split, arpeggio_lig_cons
 
 def reformat_arpeggio(arpeggio_df):
     """
@@ -601,77 +710,6 @@ def ligand_to_atom2(lig_cons_split, lig):
     lig_cons_split_rf = lig_cons_split_rf[lig_cons_split_rf["ResName (Atom1)"].isin(aas)]
     return lig_cons_split_rf
 
-def process_arpeggio(struc, all_ligs, clean_pdbs_dir, arpeggio_dir, sifts_dir, bio2asym_chain_dict, cif2pdb_chain_dict):
-    """
-    processes arpeggio output to generate the two tables that will
-    be used later in the analysis
-    """
-    lig_cons_splits = []
-    arpeggio_lig_conss = []
-    #print(struc, all_ligs)
-    #if len(all_ligs) == 0: #only happens if there is no LOI in the structure
-    #    return None, None
-        
-    for lig in all_ligs:
-        arpeggio_out_path_lig = os.path.join(arpeggio_dir, struc.replace("pdb", "clean_{}.bs_contacts".format(lig)))
-        
-        all_cons_lig = pd.read_table(arpeggio_out_path_lig, header = None)
-
-        lig_cons_split_lig = reformat_arpeggio(all_cons_lig)
-
-        lig_cons_split_lig = add_resnames_to_arpeggio_table(struc, clean_pdbs_dir, lig_cons_split_lig)
-
-        lig_cons_split_lig = ligand_to_atom2(lig_cons_split_lig, lig)
-        
-        lig_cons_split_lig["contact_type"] = lig_cons_split_lig.apply(lambda row: contact_type(row), axis = 1)
-
-        arpeggio_lig_cons_lig = lig_cons_split_lig.sort_values(by = ["Chain (Atom1)", "ResNum (Atom1)"])
-        arpeggio_lig_cons_lig = arpeggio_lig_cons_lig[["ResNum (Atom1)","Chain (Atom1)", 'ResName (Atom1)']] 
-        arpeggio_lig_cons_lig = arpeggio_lig_cons_lig.drop_duplicates(subset = ["ResNum (Atom1)", "Chain (Atom1)"])
-        arpeggio_lig_cons_lig = arpeggio_lig_cons_lig.rename(index = str, columns = {"ResNum (Atom1)": "PDB_ResNum", "Chain (Atom1)": "PDB_ChainID"}) 
-        arpeggio_lig_cons_lig = arpeggio_lig_cons_lig.astype({"PDB_ResNum": int})
-        
-        lig_cons_splits.append(lig_cons_split_lig)
-        arpeggio_lig_conss.append(arpeggio_lig_cons_lig)
-    
-    lig_cons_split = pd.concat(lig_cons_splits)
-    arpeggio_lig_cons = pd.concat(arpeggio_lig_conss)
-    
-    ########################### ADDED TO AVOID INCORRECT BS DEFINITION DUE TO PDB RESNUMS ###########################
-    pdb_id = struc[:4]
-    sifts_mapping = pd.read_csv(os.path.join(sifts_dir, "sifts_mapping_{}.csv".format(pdb_id)))
-
-    sifts_dict = {}
-    for chain, chain_df in sifts_mapping.groupby("PDB_ChainID"):
-        for i, row in chain_df.iterrows():
-            sifts_dict[(chain, str(row["PDB_ResNum"]))] = row["UniProt_ResNum"]
-    #print(sifts_dict)
-    
-    sifts_dict = extend_sifts_mapping_dict(sifts_dict, bio2asym_chain_dict, cif2pdb_chain_dict)
-    
-    #print(sifts_dict)
-    #print(arpeggio_lig_cons.columns.tolist())
-    lig_cons_split['ResNum (Atom1)'] = lig_cons_split['ResNum (Atom1)'].astype(str)
-    arpeggio_lig_cons['PDB_ResNum'] = arpeggio_lig_cons['PDB_ResNum'].astype(str)
-    lig_cons_split["UniProt_Resnum"] = lig_cons_split.set_index(['Chain (Atom1)', 'ResNum (Atom1)']).index.map(sifts_dict.get)
-    arpeggio_lig_cons["UniProt_Resnum"] = arpeggio_lig_cons.set_index(['PDB_ChainID', 'PDB_ResNum']).index.map(sifts_dict.get)
-    ########################### ADDED TO AVOID INCORRECT BS DEFINITION DUE TO PDB RESNUMS ###########################
-    old_len1 = len(arpeggio_lig_cons)
-    old_len2 = len(lig_cons_split)
-    lig_cons_split = lig_cons_split[~lig_cons_split.UniProt_Resnum.isnull()]
-    arpeggio_lig_cons = arpeggio_lig_cons[~arpeggio_lig_cons.UniProt_Resnum.isnull()]
-    new_len1 = len(arpeggio_lig_cons)
-    new_len2 = len(lig_cons_split)
-    if new_len1 != old_len1:
-        print("WARNING!!! {} residues lacked mapping from PDB to UniProt at arpeggio_lig_cons for {}".format(new_len1-old_len1, pdb_id))
-    if new_len2 != old_len2:
-        print("WARNING!!! {} residues lacked mapping from PDB to UniProt at lig_cons_split for {}".format(new_len2-old_len2, pdb_id))
-    ########################### ADDED TO AVOID INCORRECT BS DEFINITION DUE TO LACKING MAPPING TO PDB RESNUMS ###########################
-    lig_cons_split.to_csv(os.path.join(arpeggio_dir,  "arpeggio_all_cons_split_" + struc[:4] + ".csv"), index = False)
-    arpeggio_lig_cons.to_csv(os.path.join(arpeggio_dir,  "arpeggio_lig_cons_" + struc[:4] + ".csv"), index = False)
-    
-    return lig_cons_split, arpeggio_lig_cons
-
 def extend_sifts_mapping_dict(sifts_dict, bio2asym_chain_dict, cif2pdb_chain_dict):
     """
     extends PDB-UniProt residue number mapping so ALL chains in preferred biological assembly
@@ -694,108 +732,50 @@ def contact_type(row):
     else:
         return "sidechain"
 
-# ## DSSP AND SIFTS PART CODE ###
+### BINDING SITE DEFINITION ###
 
-def run_dssp(struc, supp_pdbs_dir, dssp_dir):
+def def_bs_oc(results_dir, pdb_files, prot, subdir, lig_names, bs_def_out, attr_out, chimera_script_out, arpeggio_dir, metric = "i_rel", dist = 0.66, method = "complete", alt_fmt = False):
     """
-    runs DSSP, saves and return resulting output dataframe
+    given a set of pdb structures, and other arguments, clusters ligands in space,
+    defines binding sites and writes chimera attribute files and chimera script to
+    format the superimposed structures to facilitate visualisation
+    
+    alt_fmt is a boolean I added so it works with slightly different input. Still PDB
+    files, but some which coordinates were transformed using PDBe-KB transformation
+    matrices. They have different nomenclature and therefore indices to get pdb_files_dict
+    must be different
     """
-    dssp_csv = os.path.join(dssp_dir, "dssp_" + struc.replace("pdb", "csv")) # output csv filepath
-    dssp_out = os.path.join(dssp_dir, struc.replace("pdb", "dssp"))
-    struc_in = os.path.join(supp_pdbs_dir, struc)
-    DSSPrunner(inputfile = struc_in, outputfile = dssp_out).write()            # runs DSSP
-    dssp_data = DSSPreader(inputfile = dssp_out).read()            # reads DSSP output
-    dssp_data = dssp_data.rename(index = str, columns = {"RES": "PDB_ResNum"})
-    dssp_data.PDB_ResNum = dssp_data.PDB_ResNum.astype(str)
-    dssp_cols = ["PDB_ResNum", "SS", "ACC", "KAPPA", "ALPHA", "PHI", "PSI", "RSA"]    # selects subset of columns
-    dssp_data.to_csv(dssp_csv, index = False)
-    return dssp_data[dssp_cols]
+    lig_data_df, labs = generate_ligs_res_df(arpeggio_dir, alt_fmt = alt_fmt)
 
-def process_sifts_data(input_sifts, sifts_dir, pdb_id):
-    """
-    processes SIFTS table, saves and returns the processed tables
-    """
-    sifts_data = SIFTSreader(inputfile = input_sifts).read() # read sifts data
-    sifts_mapping = sifts_data[[
-            "UniProt_dbResNum", "UniProt_dbResName", "PDB_dbResName",
-            "PDB_dbResNum", "PDB_dbChainId"
-        ]] # subsetting sifts table
+    if len(lig_data_df) == 1: #should only happen in the case of only one LOI
+        lig_data_df["binding_site"] = 0
+    else:
+        dis_out = os.path.join(results_dir, "{}_{}_{}.dis".format(prot, subdir, metric))
+        get_dis_file(lig_data_df, labs, dis_out, metric = metric)
         
-    sifts_mapping = sifts_mapping.rename(index = str, columns = {
-            "UniProt_dbResNum":"UniProt_ResNum", "UniProt_dbResName":"UniProt_ResName",
-            "PDB_dbResName":"PDB_ResName", "PDB_dbResNum":"PDB_ResNum",
-            "PDB_dbChainId":"PDB_ChainID"
-        }) # renaming table columns
-    try:
-        sifts_mapping = sifts_mapping[sifts_mapping.UniProt_ResNum != "null"]
-    except:
-        pass
-    try:
-        sifts_mapping = sifts_mapping[~sifts_mapping.UniProt_ResNum.isnull()]
-    except:
-        pass
-    
-    sifts_mapping = sifts_mapping[sifts_mapping.PDB_ResNum != "null"]
-    sifts_mapping.UniProt_ResNum =  sifts_mapping.UniProt_ResNum.astype(int)
-    sifts_mapping.PDB_ResNum =  sifts_mapping.PDB_ResNum.astype(str)
-    
-    sifts_csv = os.path.join(sifts_dir, "sifts_" + pdb_id + ".csv") # sifts output csv file
-    sifts_data.to_csv(sifts_csv, index = False) # write sifts table to csv
-    
-    sifts_csv2 = os.path.join(sifts_dir, "sifts_mapping_" + pdb_id + ".csv")
-    sifts_mapping.to_csv(sifts_csv2, index = False)
-    
-    shutil.move(input_sifts, os.path.join(sifts_dir, os.path.basename(input_sifts)))
-    return sifts_data, sifts_mapping
+        ocout, ec = oc(dis_out, method = method, cut_t = dist)
+        oc_dict = oc2dict(ocout)
+        cluster_id_dict = {}
+        for k, v in oc_dict.items():
+            for member in v["members"]:
+                cluster_id_dict[member] = v["new_id"]
+                
+        sample_colors = list(itertools.islice(rgbs(), 200)) # new_colours
+        
+        lig_data_df["lab"] = labs 
+        lig_data_df["binding_site"] = lig_data_df.lab.map(cluster_id_dict)
 
-# ## BINDING SITE DEFINITION CODE ###
-
-def residue_mean_coordinates(x, id_cols=['pdb_id', 'auth_asym_id', 'auth_seq_id_full'], #['auth_asym_id', 'auth_seq_id_full'],
-                              value_cols=['Cartn_x', 'Cartn_y', 'Cartn_z'],
-                              extra_cols=['auth_comp_id']):
-    """
-    Average coordinates by residue
-    """
-    #print("These are the value cols: {}".format(value_cols))
-    mean_coords = x.groupby(id_cols+extra_cols)[value_cols].mean()
-    return mean_coords.reindex()
-
-def write_bs_attribute_file(clustered_fragments, attr_out):
-    """
-    writes Chimera attribute file to later colour ligands
-    according to the binding site they bind to
-    """
-    with open(attr_out, "w") as out:
-        out.write("attribute: binding_site\n")
-        out.write("match mode: 1-to-1\n")
-        out.write("recipient: residues\n")
-        out.write("\n".join("\t" + clustered_fragments.chimera_atom_spec.values + "\t" + clustered_fragments.binding_site.astype(str)))
-
-def write_chimera_script(chimera_script_out, bs_labels):
-    """
-    writes Chimera script that will format the superimposed structures
-    as well as colour ligands according to their binding site
-    """
-    sample_colors = list(itertools.islice(rgbs(), 200)) # new_colours
+    if alt_fmt == True:
+        pdb_files_dict = {f[-16:-10]: f.split("/")[-1] for f in pdb_files}
+        lig_data_df["pdb_id2"] = lig_data_df.pdb_id + "_" + lig_data_df.lig_chain
+        lig_data_df["pdb_path"] = lig_data_df.pdb_id2.map(pdb_files_dict)
+    else:
+        pdb_files_dict = {f[-18:-14]: f.split("/")[-1] for f in pdb_files}
+        lig_data_df["pdb_path"] = lig_data_df.pdb_id.map(pdb_files_dict)
     
-    chimera_rgb_string = [','.join(map(str, rgb)) for rgb in sample_colors]
-    cmds = [
-        "~rib", "rib #0", "ksdssp", "set silhouette", "set silhouettewidth 3",
-        "background solid white", "~dis", "sel ~@/color=white", "dis sel", "namesel lois",
-        "~sel"
-    ]
-    with open(chimera_script_out, 'w') as out:
-        out.write('# neutral colour for everything not assigned a cluster\n')
-        out.write('colour white\n')
+    write_bs_files(lig_data_df, bs_def_out, attr_out, chimera_script_out)
     
-        out.write('# colour each binding site\n')
-        for i in range(0, len(bs_labels)):
-            out.write('colour {} :/binding_site=={}\n'.format(','.join(list(map(str, list(sample_colors[i])))), i))
-        out.write("### SOME FORMATTING ###\n")
-        out.write("\n".join(cmds))
-    print("Chimera script successfully created!")
-
-# ## NEW BINDING SITE DEFINTION FUNCTIONS ###
+    return lig_data_df, labs
 
 def generate_ligs_res_df(arpeggio_dir, alt_fmt = False):
     """
@@ -822,20 +802,37 @@ def generate_ligs_res_df(arpeggio_dir, alt_fmt = False):
     labs = [pdbs[i] + "_" + str(ligs[i]) + "_" + str(resnums[i]) + "_" + str(chains[i]) for i in range(len(ligs))]
     return lig_data_df, labs
 
-def jaccard_sim(l1, l2):
+def get_dis_file(lig_data_df, labs, out, metric = "i_rel"):
     """
-    Calculates Jaccard Similiarity index.
+    creates dis file to be fed to OC
     """
-    I = len(list(set(l1).intersection(l2)))
-    U = (len(set(l1)) + len(set(l2))) - I
-    return float(I) / U
+    lig_res = lig_data_df.binding_res.tolist() #this is a list of lists, each list contains residue numbers interacting with ligand
+    if metric == "i_rel":
+        intersect_dict = get_intersect_rel_matrix(lig_res)
+    elif metric == "i_abs":
+        intersect_dict = get_intersect_matrix(lig_res)
+    n_ligs = len(lig_res)
+    with open(out, "w+") as fh:
+        fh.write(str(n_ligs) + "\n")
+        for lab in labs: #labs contain unique identifier for a ligand
+            fh.write(lab + "\n")
+        for i in range(n_ligs):
+            for j in range(i+1, n_ligs):
+                fh.write(str(intersect_dict[i][j]) + "\n")
 
-def intersection(l1, l2):
+def get_intersect_rel_matrix(binding_ress):
     """
-    Calculates intersection.
+    Given a set of ligand binding residues, calcualtes a
+    similarity matrix between all the different sets of ligand
+    binding residues.
     """
-    I = len(list(set(l1).intersection(l2)))
-    return I
+    inters = {i: {} for i in range(len(binding_ress))}
+    for i in range(len(binding_ress)):
+        inters[i][i] = intersection_rel(binding_ress[i], binding_ress[i])
+        for j in range(i+1, len(binding_ress)):
+            inters[i][j] = intersection_rel(binding_ress[i], binding_ress[j])
+            inters[j][i] = inters[i][j]
+    return inters
 
 def intersection_rel(l1, l2):
     """
@@ -861,264 +858,12 @@ def get_intersect_matrix(binding_ress):
             inters[j][i] = inters[i][j]
     return inters
 
-def get_intersect_rel_matrix(binding_ress):
+def intersection(l1, l2):
     """
-    Given a set of ligand binding residues, calcualtes a
-    similarity matrix between all the different sets of ligand
-    binding residues.
+    Calculates intersection.
     """
-    inters = {i: {} for i in range(len(binding_ress))}
-    for i in range(len(binding_ress)):
-        inters[i][i] = intersection_rel(binding_ress[i], binding_ress[i])
-        for j in range(i+1, len(binding_ress)):
-            inters[i][j] = intersection_rel(binding_ress[i], binding_ress[j])
-            inters[j][i] = inters[i][j]
-    return inters
-
-def get_sims_matrix(binding_ress):
-    """
-    Given a set of ligand binding residues, calcualtes a
-    similarity matrix between all the different sets of ligand
-    binding residues.
-    """
-    sims = {i: {} for i in range(len(binding_ress))}
-    for i in range(len(binding_ress)):
-        sims[i][i] = 1
-        for j in range(i+1, len(binding_ress)):
-            sims[i][j] = jaccard_sim(binding_ress[i], binding_ress[j])
-            sims[j][i] = sims[i][j]
-    return sims
-
-def get_dist_mat(lig_data_df, labs, arpeggio_dir, pdb_files):
-    """
-    doc
-    """
-    pdb_ids = [pdb_file.split("/")[-1][:4] for pdb_file in pdb_files]
-    lig_data_df_filt = lig_data_df[lig_data_df.pdb_id.isin(pdb_ids)]
-    labs_filt = [lab for lab in labs if lab[:4] in pdb_ids]
-    print("lig_data_df == lig_data_df_filt is {}".format(lig_data_df.equals(lig_data_df_filt)))
-    print("labs == labs_filt is {}".format(labs == labs_filt))
-    sims = get_sims_matrix(lig_data_df_filt.binding_res.tolist())
-    sims_df = pd.DataFrame(sims)
-    dists_df = 1 -(sims_df)
-    return dists_df, labs_filt, lig_data_df_filt
-
-def plot_cluster_ligs_dendrogram(prot, dist, labs, z, out, show = False):
-    fig = plt.figure(figsize=(40, 15), dpi=300)
-    plt.title("Ligand clustering for {}".format(prot), fontsize = 30, pad = 15)
-    plt.axhline(dist, linestyle = "--", linewidth = 1.5, color = "gray")
-    dd = scipy.cluster.hierarchy.dendrogram(z, labels = labs, leaf_font_size = 10, color_threshold = dist)
-    if out != None:
-        if os.path.isfile(out):
-            pass
-        else:
-            plt.savefig(out)
-            #print("Figure was successfully saved!")
-    if show == True:
-        plt.show()
-    else:
-        plt.close()
-
-def write_bs_files(frag_mean_coords, bs_def_out, attr_out, chimera_script_out):
-    """
-    doc
-    """
-    frag_mean_coords = frag_mean_coords.dropna()
-    frag_mean_coords.binding_site = frag_mean_coords.binding_site.astype(int)
-    frag_mean_coords.lig_resnum = frag_mean_coords.lig_resnum.astype(int)
-    chimera_atom_spec = (':'+ frag_mean_coords.lig_resnum.astype(str) +
-                     '.'+ frag_mean_coords.lig_chain +
-                     '&#/name==' + frag_mean_coords.pdb_path)
-    frag_mean_coords = frag_mean_coords.assign(chimera_atom_spec = chimera_atom_spec)  
-    frag_mean_coords.to_csv(bs_def_out, index = False) # saves table to csv
-    write_bs_attribute_file(frag_mean_coords, attr_out)
-    bs_labs = frag_mean_coords.binding_site.unique().tolist()
-    write_chimera_script(chimera_script_out, bs_labs)
-
-def def_bs_residue_sets(results_dir, pdb_files, prot, lig_names, bs_def_out, attr_out, chimera_script_out, arpeggio_dir, dist = 0.9, method = "complete", save = True, show = False, out = None, alt_fmt = False): # TO DO: ACCOMODATE FOR AS MANY BINDING SITES (COLOURS) AS NEEDED
-    """
-    given a set of pdb structures, and other arguments, clusters ligands in space,
-    defines binding sites and writes chimera attribute files and chimera script to
-    format the superimposed structures to facilitate visualisation
-    
-    alt_fmt is a boolean I added so it works with slightly different input. Still PDB
-    files, but some which coordinates were transformed using PDBe-KB transformation
-    matrices. They have different nomenclature and therefore indices to get pdb_files_dict
-    must be different
-    """
-    lig_data_df, labs = generate_ligs_res_df(arpeggio_dir, alt_fmt = alt_fmt)
-    #return lig_data_df, labs
-    if len(lig_data_df) == 1: #should only happen in the case of only one LOI
-        print("There is only 1 protein-ligand interaction for {}".format(prot))
-        lig_data_df["binding_site"] = 0
-    else:
-        dists_df, labs_filt, lig_data_df_filt = get_dist_mat(lig_data_df, labs, arpeggio_dir, pdb_files)
-        #return dists_df, labs_filt, lig_data_df_filt
-        z = scipy.cluster.hierarchy.linkage(
-            scipy.spatial.distance.squareform(dists_df),
-            method = method
-        )
-        cutree = scipy.cluster.hierarchy.cut_tree(z, height = dist) # clusters coordinates
-        cluster_ids = [int(cut) for cut in cutree]
-        cluster_id_dict = {labs[i]: cluster_ids[i] for i in range(len(labs))}
-        sample_colors = list(itertools.islice(rgbs(), 200)) # new_colours
-        lig_data_df_filt["lab"] = labs_filt 
-        lig_data_df_filt["binding_site"] = lig_data_df_filt.lab.map(cluster_id_dict)
-        if save == True:
-            plot_cluster_ligs_dendrogram(prot, dist, labs, z, out, show)
-            
-    #return lig_data_df_filt, pdb_files
-    if alt_fmt == True:
-        pdb_files_dict = {f[-16:-10]: f.split("/")[-1] for f in pdb_files}
-        lig_data_df["pdb_id2"] = lig_data_df.pdb_id + "_" + lig_data_df.lig_chain
-        lig_data_df["pdb_path"] = lig_data_df.pdb_id2.map(pdb_files_dict)
-    else:
-        pdb_files_dict = {f[-18:-14]: f.split("/")[-1] for f in pdb_files}
-        lig_data_df["pdb_path"] = lig_data_df.pdb_id.map(pdb_files_dict)
-    
-    write_bs_files(lig_data_df_filt, bs_def_out, attr_out, chimera_script_out)
-    
-    return lig_data_df_filt, labs_filt
-
-
-def define_binding_sites(pdb_files, lig_names, bs_def_out, attr_out, chimera_script_out, eps = 5): # TO DO: ACCOMODATE FOR AS MANY BINDING SITES (COLOURS) AS NEEDED
-    """
-    given a set of pdb structures, and other arguments, clusters ligands in space,
-    defines binding sites and writes chimera attribute files and chimera script to
-    format the superimposed structures to facilitate visualisation
-    """
-    all_coords_atoms_path = os.path.join(os.path.dirname(bs_def_out), "all_coords.csv")
-    if os.path.isfile(all_coords_atoms_path):
-        #print("ALL coords df already exists!")
-        all_coords_atoms = pd.read_csv(all_coords_atoms_path)
-    else:
-        all_coords_atoms = pd.concat({os.path.basename(f): PDBXreader(inputfile = f).atoms(format_type = "pdb", excluded=())
-                              for f in pdb_files}) # creates df with concatenation of atom coordinates for each file
-        all_coords_atoms.index.names = ['pdb_id', ''] # sets fragment names as index of df
-        all_coords_atoms.to_csv(all_coords_atoms_path, index = True)
-    all_coords_residues = residue_mean_coordinates(
-        all_coords_atoms, id_cols = ['pdb_id', 'auth_asym_id', 'auth_seq_id_full']
-    )
-    fragment_mean_coords = all_coords_residues.query('auth_comp_id in {}'.format(lig_names)) # subsets df to keep only ligand coordinates
-    cluster_dbscan = DBSCAN(eps=eps, min_samples=1).fit(fragment_mean_coords) # clusters coordinates
-    clustered_fragments = fragment_mean_coords.assign(binding_site = cluster_dbscan.labels_).reset_index() # creates labels
-    chimera_atom_spec = (':'+ clustered_fragments.auth_seq_id_full.astype(str) +
-                     '.'+ clustered_fragments.auth_asym_id +
-                     '&#/name==' + clustered_fragments.pdb_id)
-    clustered_fragments = clustered_fragments.assign(chimera_atom_spec = chimera_atom_spec)  
-    clustered_fragments.to_csv(bs_def_out, index = False) # saves table to csv
-    write_bs_attribute_file(clustered_fragments, attr_out)
-    bs_labels = clustered_fragments.binding_site.unique().tolist()
-    write_chimera_script(chimera_script_out, bs_labels)
-
-def define_complete_linkage_binding_sites(pdb_files, lig_names, bs_def_out, attr_out, chimera_script_out, d = 5, show = False, out = None): # TO DO: ACCOMODATE FOR AS MANY BINDING SITES (COLOURS) AS NEEDED
-    """
-    given a set of pdb structures, and other arguments, clusters ligands in space,
-    defines binding sites and writes chimera attribute files and chimera script to
-    format the superimposed structures to facilitate visualisation
-    """
-    all_coords_atoms_path = os.path.join(os.path.dirname(bs_def_out), "all_coords.csv")
-    if os.path.isfile(all_coords_atoms_path):
-        #print("ALL coords df already exists!")
-        all_coords_atoms = pd.read_csv(all_coords_atoms_path)
-    else:
-        all_coords_atoms = pd.concat({os.path.basename(f): PDBXreader(inputfile = f).atoms(format_type = "pdb", excluded=())
-                              for f in pdb_files}) # creates df with concatenation of atom coordinates for each file
-        all_coords_atoms.index.names = ['pdb_id', ''] # sets fragment names as index of df
-        all_coords_atoms.to_csv(all_coords_atoms_path, index = True)
-    all_coords_residues = residue_mean_coordinates(
-        all_coords_atoms, id_cols = ['pdb_id', 'auth_asym_id', 'auth_seq_id_full']
-    )
-    fragment_mean_coords = all_coords_residues.query('auth_comp_id in {}'.format(lig_names)) # subsets df to keep only ligand coordinates
-    fragment_mean_coords = fragment_mean_coords.reset_index()
-    coords = fragment_mean_coords[["Cartn_x", "Cartn_y", "Cartn_z"]]
-    pdists = scipy.spatial.distance.pdist(coords)
-    labs = fragment_mean_coords.auth_comp_id.tolist()
-    z = scipy.cluster.hierarchy.linkage(pdists, method = "complete")
-    if show == True:
-        fig = plt.figure(figsize=(37.5, 15))
-        scipy.cluster.hierarchy.dendrogram(z, labels = labs, leaf_font_size = 10, color_threshold = d)
-        if out != None:
-            plt.savefig(out)
-            #print("Figure was successfully saved!")
-        plt.show()
-    cutree = scipy.cluster.hierarchy.cut_tree(z, height = d) # clusters coordinates
-    cluster_ids = [int(cut) for cut in cutree]
-    fragment_mean_coords["binding_site"] = cluster_ids
-    chimera_atom_spec = (':'+ fragment_mean_coords.auth_seq_id_full.astype(str) +
-                     '.'+ fragment_mean_coords.auth_asym_id +
-                     '&#/name==' + fragment_mean_coords.pdb_id)
-    fragment_mean_coords = fragment_mean_coords.assign(chimera_atom_spec = chimera_atom_spec)  
-    fragment_mean_coords.to_csv(bs_def_out, index = False) # saves table to csv
-    write_bs_attribute_file(fragment_mean_coords, attr_out)
-    bs_labels = fragment_mean_coords.binding_site.unique().tolist()
-    write_chimera_script(chimera_script_out, bs_labels)
-
-    ###  OC binding site deifinition functions ###
-
-def def_bs_oc(results_dir, pdb_files, prot, subdir, lig_names, bs_def_out, attr_out, chimera_script_out, arpeggio_dir, metric = "i_rel", dist = 0.66, method = "complete", alt_fmt = False):
-    """
-    given a set of pdb structures, and other arguments, clusters ligands in space,
-    defines binding sites and writes chimera attribute files and chimera script to
-    format the superimposed structures to facilitate visualisation
-    
-    alt_fmt is a boolean I added so it works with slightly different input. Still PDB
-    files, but some which coordinates were transformed using PDBe-KB transformation
-    matrices. They have different nomenclature and therefore indices to get pdb_files_dict
-    must be different
-    """
-    lig_data_df, labs = generate_ligs_res_df(arpeggio_dir, alt_fmt = alt_fmt)
-    
-    #return lig_data_df, labs
-
-    if len(lig_data_df) == 1: #should only happen in the case of only one LOI
-        lig_data_df["binding_site"] = 0
-    else:
-        dis_out = os.path.join(results_dir, "{}_{}_{}.dis".format(prot, subdir, metric))
-        get_dis_file(lig_data_df, labs, dis_out, metric = metric)
-        
-        ocout, ec = oc(dis_out, method = method, cut_t = dist)
-        oc_dict = oc2dict(ocout)
-        #print(len(oc_dict))
-        cluster_id_dict = {}
-        for k, v in oc_dict.items():
-            for member in v["members"]:
-                cluster_id_dict[member] = v["new_id"]
-                
-        sample_colors = list(itertools.islice(rgbs(), 200)) # new_colours
-        
-        lig_data_df["lab"] = labs 
-        lig_data_df["binding_site"] = lig_data_df.lab.map(cluster_id_dict)
-
-    if alt_fmt == True:
-        pdb_files_dict = {f[-16:-10]: f.split("/")[-1] for f in pdb_files}
-        lig_data_df["pdb_id2"] = lig_data_df.pdb_id + "_" + lig_data_df.lig_chain
-        lig_data_df["pdb_path"] = lig_data_df.pdb_id2.map(pdb_files_dict)
-    else:
-        pdb_files_dict = {f[-18:-14]: f.split("/")[-1] for f in pdb_files}
-        lig_data_df["pdb_path"] = lig_data_df.pdb_id.map(pdb_files_dict)
-    
-    write_bs_files(lig_data_df, bs_def_out, attr_out, chimera_script_out)
-    
-    return lig_data_df, labs
-
-def get_dis_file(lig_data_df, labs, out, metric = "i_rel"):
-    """
-    creates dis file to be fed to OC
-    """
-    lig_res = lig_data_df.binding_res.tolist() #this is a list of lists, each list contains residue numbers interacting with ligand
-    if metric == "i_rel":
-        intersect_dict = get_intersect_rel_matrix(lig_res)
-    elif metric == "i_abs":
-        intersect_dict = get_intersect_matrix(lig_res)
-    n_ligs = len(lig_res)
-    with open(out, "w+") as fh:
-        fh.write(str(n_ligs) + "\n")
-        for lab in labs: #labs contain unique identifier for a ligand
-            fh.write(lab + "\n")
-        for i in range(n_ligs):
-            for j in range(i+1, n_ligs):
-                fh.write(str(intersect_dict[i][j]) + "\n")
+    I = len(list(set(l1).intersection(l2)))
+    return I
 
 def oc(oc_in, type_mat = "sim", method = "complete", cut_t = 0.66):
     """
@@ -1162,46 +907,69 @@ def oc2dict(ocout):
                 n_cluster += 1
     return oc_dict
 
-def process_clustered_fragments(clustered_fragments_path):
+def write_bs_files(frag_mean_coords, bs_def_out, attr_out, chimera_script_out):
     """
-    generates data frame with ligand chain, resnum and binding site where it is found
-    for each one of the structures of the set
+    doc
     """
-    clustered_fragments = pd.read_csv(clustered_fragments_path)
-    clustered_fragments = clustered_fragments[["pdb_id", "auth_asym_id", "auth_seq_id_full", "binding_site"]]
-    clustered_fragments["pdb_id"] = [el[0][:4] for el in clustered_fragments.pdb_id.str.split(".").tolist()]
-    clustered_fragments = clustered_fragments.rename(columns={"auth_asym_id": "chain", "auth_seq_id_full": "resnum"})
-    return clustered_fragments
+    frag_mean_coords = frag_mean_coords.dropna()
+    frag_mean_coords.binding_site = frag_mean_coords.binding_site.astype(int)
+    frag_mean_coords.lig_resnum = frag_mean_coords.lig_resnum.astype(int)
+    chimera_atom_spec = (':'+ frag_mean_coords.lig_resnum.astype(str) +
+                     '.'+ frag_mean_coords.lig_chain +
+                     '&#/name==' + frag_mean_coords.pdb_path)
+    frag_mean_coords = frag_mean_coords.assign(chimera_atom_spec = chimera_atom_spec)  
+    frag_mean_coords.to_csv(bs_def_out, index = False) # saves table to csv
+    write_bs_attribute_file(frag_mean_coords, attr_out)
+    bs_labs = frag_mean_coords.binding_site.unique().tolist()
+    write_chimera_script(chimera_script_out, bs_labs)
 
-def get_protein_chains(pdb_id, sifts_dir): 
+def write_bs_attribute_file(clustered_fragments, attr_out):
     """
-    gets chain IDs mapping to protein of interest from mapping csvs
+    writes Chimera attribute file to later colour ligands
+    according to the binding site they bind to
     """
-    mapping_df = pd.read_csv(os.path.join(sifts_dir, "sifts_mapping_{}.csv".format(pdb_id)))
-    mapping_df.PDB_ResNum = mapping_df.PDB_ResNum.astype(str)
-    prot_chains = mapping_df.PDB_ChainID.unique().tolist()
-    return prot_chains
+    with open(attr_out, "w") as out:
+        out.write("attribute: binding_site\n")
+        out.write("match mode: 1-to-1\n")
+        out.write("recipient: residues\n")
+        out.write("\n".join("\t" + clustered_fragments.chimera_atom_spec.values + "\t" + clustered_fragments.binding_site.astype(str)))
 
-def create_bs_colouring_script(bs_definition, pdbs, arpeggio_dir, sifts_dir, chimera_out):
+def write_chimera_script(chimera_script_out, bs_labels):
     """
-    creates a chimera script that colours residues binding ligands
-    in each structure of the set according to a given colour code
+    writes Chimera script that will format the superimposed structures
+    as well as colour ligands according to their binding site
     """
     sample_colors = list(itertools.islice(rgbs(), 200)) # new_colours
-    chimera_rgb_strings = [','.join(map(str, rgb)) for rgb in sample_colors]
-    with open(chimera_out, "w") as out:
-        for index, row in bs_definition.iterrows():
-            model_name = "{}_bio.clean.pdb".format(row.pdb_id)
-            fragment_cons = pd.read_csv(os.path.join(arpeggio_dir, "arpeggio_all_cons_split_{}.csv".format(row.pdb_id)))
-            prot_chains = get_protein_chains(row.pdb_id, sifts_dir)
-            binding_res = fragment_cons[(fragment_cons["Chain (Atom2)"] == row.lig_chain)&(fragment_cons["ResNum (Atom2)"] == row.lig_resnum)&(fragment_cons["Chain (Atom1)"].isin(prot_chains))].drop_duplicates(subset = ["Chain (Atom1)", "ResNum (Atom1)", "Chain (Atom2)", "ResNum (Atom2)"]).sort_values(by = ["ResNum (Atom1)"])["ResNum (Atom1)"].tolist()
-            binding_res_chain = fragment_cons[(fragment_cons["Chain (Atom2)"] == row.lig_chain)&(fragment_cons["ResNum (Atom2)"] == row.lig_resnum)&(fragment_cons["Chain (Atom1)"].isin(prot_chains))].drop_duplicates(subset = ["Chain (Atom1)", "ResNum (Atom1)", "Chain (Atom2)", "ResNum (Atom2)"]).sort_values(by = ["ResNum (Atom1)"])["Chain (Atom1)"].tolist()
-            sel_string = ",".join([str(binding_res[i])+"."+binding_res_chain[i] for i in range(0, len(binding_res))])
-            out.write("col {} :{}&#/name=={}\n".format(chimera_rgb_strings[row.binding_site], sel_string, model_name))
-            out.write("dis : {}&#/name=={}\n".format(sel_string, model_name))
-    print("Chimera script written!")
+    
+    chimera_rgb_string = [','.join(map(str, rgb)) for rgb in sample_colors]
+    cmds = [
+        "~rib", "rib #0", "ksdssp", "set silhouette", "set silhouettewidth 3",
+        "background solid white", "~dis", "sel ~@/color=white", "dis sel", "namesel lois",
+        "~sel"
+    ]
+    with open(chimera_script_out, 'w') as out:
+        out.write('# neutral colour for everything not assigned a cluster\n')
+        out.write('colour white\n')
+    
+        out.write('# colour each binding site\n')
+        for i in range(0, len(bs_labels)):
+            out.write('colour {} :/binding_site=={}\n'.format(','.join(list(map(str, list(sample_colors[i])))), i))
+        out.write("### SOME FORMATTING ###\n")
+        out.write("\n".join(cmds))
+    print("Chimera script successfully created!")
 
-# ## MSA FROM STRUCTURE CREATION CODE ###
+### CONSERVATION AND VARIATION ###
+
+def create_alignment_from_struc(example_struc, fasta_path, pdb_fmt = "pdb", n_it = 3, seqdb = swissprot):
+    """
+    given an example structure, creates and reformats an MSA
+    """
+    create_fasta_from_seq(get_seq_from_pdb(example_struc, pdb_fmt = pdb_fmt), fasta_path) # CREATES FASTA FILE FROM PDB FILE
+    hits_out = fasta_path.replace("fa", "out")
+    hits_aln = fasta_path.replace("fa", "sto")
+    hits_aln_rf = fasta_path.replace(".fa", "_rf.sto")
+    jackhmmer(fasta_path, hits_out, hits_aln , n_it = n_it, seqdb = seqdb,) # RUNS JACKHAMMER USING AS INPUT THE SEQUENCE FROM THE PDB AND GENERATES ALIGNMENT
+    add_acc2msa(hits_aln, hits_aln_rf)
 
 def get_seq_from_pdb(pdb_path, pdb_fmt = "mmcif"): # MIGHT NEED TO BE MORE SELECTIVE WITH CHAIN, ETC
     """
@@ -1222,20 +990,9 @@ def jackhmmer(seq, hits_out, hits_aln, n_it = 3, seqdb = swissprot):
     runs jackhmmer on an input seq for a number of iterations and returns exit code, should be 0 if all is ok
     """
     args = ["jackhmmer", "-N", str(n_it), "-o", hits_out, "-A", hits_aln, seq, seqdb]
-    #print(" ".join(args))
     exit_code = os.system(" ".join(args))
     return exit_code
 
-def create_alignment_from_struc(example_struc, fasta_path, pdb_fmt = "pdb", n_it = 3, seqdb = swissprot):
-    """
-    given an example structure, creates and reformats an MSA
-    """
-    create_fasta_from_seq(get_seq_from_pdb(example_struc, pdb_fmt = pdb_fmt), fasta_path) # CREATES FASTA FILE FROM PDB FILE
-    hits_out = fasta_path.replace("fa", "out")
-    hits_aln = fasta_path.replace("fa", "sto")
-    hits_aln_rf = fasta_path.replace(".fa", "_rf.sto")
-    jackhmmer(fasta_path, hits_out, hits_aln , n_it = n_it, seqdb = seqdb,) # RUNS JACKHAMMER USING AS INPUT THE SEQUENCE FROM THE PDB AND GENERATES ALIGNMENT
-    add_acc2msa(hits_aln, hits_aln_rf)
 def add_acc2msa(aln_in, aln_out, fmt_in = "stockholm"):
     """
     modifies AC field of jackhmmer alignment in stockholm format.
@@ -1256,17 +1013,6 @@ def add_acc2msa(aln_in, aln_out, fmt_in = "stockholm"):
             rec.annotations["accession"] = rec.id.split("|")[1]
             recs.append(rec)
     Bio.SeqIO.write(recs, aln_out, fmt_in)
-### MSA FORMATING AND UTILS ###
-
-
-
-def get_target_prot_cols(msa_in, msa_fmt = "stockholm"): 
-    """
-    returns list of MSA col idx that are popualted on the protein target
-    """
-    seqs = [str(rec.seq) for rec in Bio.SeqIO.parse(msa_in, msa_fmt) if "query" in rec.id]
-    occupied_cols = [i+1 for seq in seqs for i, el in enumerate(seq) if el != "-"]
-    return sorted(list(set(occupied_cols)))
 
 def get_human_subset_msa(aln_in, human_msa_out, fmt_in = "stockholm"):
     """
@@ -1284,26 +1030,60 @@ def get_human_subset_msa(aln_in, human_msa_out, fmt_in = "stockholm"):
     Bio.SeqIO.write(human_recs, human_msa_out, "stockholm")
     print(aln_in.split("/")[-1][:-4], h, n)
 
-def get_swissprot(): 
+def get_target_prot_cols(msa_in, msa_fmt = "stockholm"): 
     """
-    Retrieves sequences and their data from Swiss-Prot
-
-    :param db: absolute path to a fasta file containing sequences, Swiss-Prot database by default
-    :type db: str
-    :returns: dictionary containing the sequence id, description and sequence for all proteins in Swiss-Prot
-    :rtpe: dict
+    returns list of MSA col idx that are popualted on the protein target
     """
-    swissprot_dict = Bio.SeqIO.parse(swissprot, "fasta")
-    proteins = {}
-    for protein in swissprot_dict:
-        acc = protein.id.split("|")[1]
-        proteins[acc] = {}
-        proteins[acc]["id"] = protein.id
-        proteins[acc]["desc"] = protein.description
-        proteins[acc]["seq"] = protein.seq
-    return proteins
+    seqs = [str(rec.seq) for rec in Bio.SeqIO.parse(msa_in, msa_fmt) if "query" in rec.id]
+    occupied_cols = [i+1 for seq in seqs for i, el in enumerate(seq) if el != "-"]
+    return sorted(list(set(occupied_cols)))
 
-# ## SHENKIN CALCULATION FUNCTIONS ### 
+def calculate_shenkin(aln_in, aln_fmt, out = None):
+    """
+    given an MSA, calculates Shenkin ans occupancy, gap
+    percentage for all columns
+    """
+    cols = in_columns(aln_in, aln_fmt)
+    scores = []
+    occ = []
+    gaps = []
+    occ_pct = []
+    gaps_pct = []
+    for k, v in cols.items():
+        scores.append(get_shenkin(v))
+        stats = (get_stats(v))
+        occ.append(stats[0])
+        gaps.append(stats[1])
+        occ_pct.append(stats[2])
+        gaps_pct.append(stats[3])
+    df = pd.DataFrame(list(zip(list(range(1,len(scores)+1)),scores, occ,gaps, occ_pct, gaps_pct)), columns = ['col','shenkin','occ','gaps','occ_pct','gaps_pct'])
+    if out != None:
+        df.to_csv(out, index = False)
+    return df
+
+def in_columns(aln_in, infmt):
+    """
+    returns dictionary in which column idx are the key
+    and a list containing all aas aligned to that column
+    is the value
+    """
+    aln = Bio.AlignIO.read(aln_in, infmt)
+    n_cols = len(aln[0])
+    cols = {}
+    for col in range(1,n_cols+1):
+        cols[col] = []
+    for row in aln:
+        seq = str(row.seq)
+        for i in range(0,len(seq)):
+            cols[i+1].append(seq[i])
+    return cols
+
+def get_shenkin(col):
+    """
+    calculates Shenkin score for an MSA column
+    """
+    S = get_entropy(get_freqs(col))
+    return (2**S)*6
 
 def get_freqs(col):
     """
@@ -1333,30 +1113,6 @@ def get_entropy(freqs):
             S += f*math.log2(f)
     return -S
 
-def get_shenkin(col):
-    """
-    calculates Shenkin score for an MSA column
-    """
-    S = get_entropy(get_freqs(col))
-    return (2**S)*6
-
-def in_columns(aln_in, infmt):
-    """
-    returns dictionary in which column idx are the key
-    and a list containing all aas aligned to that column
-    is the value
-    """
-    aln = Bio.AlignIO.read(aln_in, infmt)
-    n_cols = len(aln[0])
-    cols = {}
-    for col in range(1,n_cols+1):
-        cols[col] = []
-    for row in aln:
-        seq = str(row.seq)
-        for i in range(0,len(seq)):
-            cols[i+1].append(seq[i])
-    return cols
-
 def get_stats(col):
     """
     for a given MSA column, calculates some basic statistics
@@ -1369,31 +1125,10 @@ def get_stats(col):
     gaps_pct = 1 - occ_pct
     return occ, gaps, occ_pct, gaps_pct
 
-def calculate_shenkin(aln_in, aln_fmt, out = None):
-    """
-    given an MSA, calculates Shenkin ans occupancy, gap
-    percentage for all columns
-    """
-    cols = in_columns(aln_in, aln_fmt)
-    scores = []
-    occ = []
-    gaps = []
-    occ_pct = []
-    gaps_pct = []
-    for k, v in cols.items():
-        scores.append(get_shenkin(v))
-        stats = (get_stats(v))
-        occ.append(stats[0])
-        gaps.append(stats[1])
-        occ_pct.append(stats[2])
-        gaps_pct.append(stats[3])
-    df = pd.DataFrame(list(zip(list(range(1,len(scores)+1)),scores, occ,gaps, occ_pct, gaps_pct)), columns = ['col','shenkin','occ','gaps','occ_pct','gaps_pct'])
-    if out != None:
-        df.to_csv(out, index = False)
-    return df
-
 def get_and_format_shenkin(shenkin, prot_cols, out = None):
-    #shenkin = calculate_shenkin(hits_aln_rf, aln_fmt, shenkin_out)
+    """
+    DOC
+    """
     shenkin_filt = shenkin[shenkin.col.isin(prot_cols)]
     shenkin_filt.index = range(1, len(shenkin_filt) + 1) # CONTAINS SHENKIN SCORE, OCCUPANCY/GAP PROPORTION OF CONSENSUS COLUMNS
     min_shenkin = min(shenkin_filt.shenkin)
@@ -1404,21 +1139,46 @@ def get_and_format_shenkin(shenkin, prot_cols, out = None):
         shenkin_filt.to_csv(out, index = False)
     return shenkin_filt
 
-# ## CONSERVATION - VARIATION CALCULATION FUNCTIONS ###
+def format_variant_table(df, col_mask, vep_mask = ["missense_variant"], tab_format = "gnomad"):
+    """
+    formats variant table, by gettint rid of empty rows that are not human sequences,
+    changning column names and only keeping those variants that are of interest and
+    are present in columns of interest
+    """
+    df_filt = df.copy(deep = True)
+    df_filt.reset_index(inplace=True)
+    if tab_format == "gnomad":
+        df_filt.columns = [' '.join(col).strip() for col in df_filt.columns.tolist()]
+    df_filt.columns = [col.lower().replace(" ", "_") for col in df_filt.columns.tolist()]
+    df_filt = df_filt[df_filt.source_id.str.contains("HUMAN")]
+    df_filt = df_filt.dropna(subset=["vep_consequence"])
+    df_filt = df_filt[df_filt.vep_consequence.isin(vep_mask)]
+    df_filt = df_filt[df_filt.alignment_column.isin(col_mask)]
+    return df_filt
 
-def generate_subset_aln(aln_in, aln_fmt, df, aln_out = None):
+def get_missense_df(aln_in, aln_fmt, variants_df, shenkin_aln, prot_cols, aln_out = None, get_or = True):
     """
-    creates a subset MSA containing only human sequences that present
-    missense variants and returns the path of such MSA
+    doc
     """
-    seqs_ids = df.source_id.unique().tolist()
-    aln = Bio.SeqIO.parse(aln_in, aln_fmt)
-    variant_seqs = [rec for rec in aln if rec.id in seqs_ids]
-    if aln_out == None:
-        pref, fmt = aln_in.split(".")
-        aln_out =  pref + "_variant_seqs." + fmt
-    Bio.SeqIO.write(variant_seqs, aln_out, aln_fmt)
-    return aln_out
+    variants_aln = generate_subset_aln(aln_in, aln_fmt, variants_df, aln_out)
+    variants_aln_info = calculate_shenkin(variants_aln, aln_fmt)
+    variants_aln_info = variants_aln_info[variants_aln_info.col.isin(prot_cols)]
+    vars_df = pd.DataFrame(variants_df.alignment_column.value_counts().reindex(prot_cols, fill_value = 0).sort_index()).reset_index()
+    vars_df.index = range(1, len(prot_cols)+1)
+    vars_df.columns = ["col", "variants"]
+    merged = pd.merge(variants_aln_info, vars_df, on = "col", how = 'left')
+    merged.index = range(1, len(vars_df)+1)
+    merged.variants = merged.variants + 1 #pseudo count
+    merged.occ = merged.occ + 1 #pseudo count
+    merged["shenkin"] = shenkin_aln["shenkin"]
+    merged["rel_norm_shenkin"] = shenkin_aln["rel_norm_shenkin"] 
+    merged["abs_norm_shenkin"] = shenkin_aln["abs_norm_shenkin"]
+    
+    if get_or == True:
+        merged_or = get_OR(merged)
+        return merged_or
+    else:
+        return merged
 
 def get_OR(df, variant_col = "variants"):
     """
@@ -1443,50 +1203,19 @@ def get_OR(df, variant_col = "variants"):
         df.loc[i,'ci_dist'] = se_logor
     return df
 
-def get_missense_df(aln_in, aln_fmt, variants_df, shenkin_aln, prot_cols, aln_out = None, get_or = True):
+def generate_subset_aln(aln_in, aln_fmt, df, aln_out = None):
     """
-    doc
+    creates a subset MSA containing only human sequences that present
+    missense variants and returns the path of such MSA
     """
-    variants_aln = generate_subset_aln(aln_in, aln_fmt, variants_df, aln_out)
-    variants_aln_info = calculate_shenkin(variants_aln, aln_fmt)
-    variants_aln_info = variants_aln_info[variants_aln_info.col.isin(prot_cols)]
-    vars_df = pd.DataFrame(variants_df.alignment_column.value_counts().reindex(prot_cols, fill_value = 0).sort_index()).reset_index()
-    vars_df.index = range(1, len(prot_cols)+1)
-    vars_df.columns = ["col", "variants"]
-    merged = pd.merge(variants_aln_info, vars_df, on = "col", how = 'left')
-    merged.index = range(1, len(vars_df)+1)
-    merged.variants = merged.variants + 1 #pseudo count
-    merged.occ = merged.occ + 1 #pseudo count
-    merged["shenkin"] = shenkin_aln["shenkin"]
-    merged["rel_norm_shenkin"] = shenkin_aln["rel_norm_shenkin"] 
-    merged["abs_norm_shenkin"] = shenkin_aln["abs_norm_shenkin"]
-    
-    if get_or == True:
-        merged_or = get_OR(merged)
-        #if out != None:
-        #    merged_or.to_csv(out, index = False)
-        return merged_or
-    else:
-        #if out != None:
-        #    merged.to_csv(out, index = False)
-        return merged
-
-def format_variant_table(df, col_mask, vep_mask = ["missense_variant"], tab_format = "gnomad"):
-    """
-    formats variant table, by gettint rid of empty rows that are not human sequences,
-    changning column names and only keeping those variants that are of interest and
-    are present in columns of interest
-    """
-    df_filt = df.copy(deep = True)
-    df_filt.reset_index(inplace=True)
-    if tab_format == "gnomad":
-        df_filt.columns = [' '.join(col).strip() for col in df_filt.columns.tolist()]
-    df_filt.columns = [col.lower().replace(" ", "_") for col in df_filt.columns.tolist()]
-    df_filt = df_filt[df_filt.source_id.str.contains("HUMAN")]
-    df_filt = df_filt.dropna(subset=["vep_consequence"])
-    df_filt = df_filt[df_filt.vep_consequence.isin(vep_mask)]
-    df_filt = df_filt[df_filt.alignment_column.isin(col_mask)]
-    return df_filt
+    seqs_ids = df.source_id.unique().tolist()
+    aln = Bio.SeqIO.parse(aln_in, aln_fmt)
+    variant_seqs = [rec for rec in aln if rec.id in seqs_ids]
+    if aln_out == None:
+        pref, fmt = aln_in.split(".")
+        aln_out =  pref + "_variant_seqs." + fmt
+    Bio.SeqIO.write(variant_seqs, aln_out, aln_fmt)
+    return aln_out
 
 def add_miss_class(df, miss_df_out = None, cons_col = "shenkin", thresholds = [30, 70], colours = ["royalblue", "green", "grey", "firebrick", "orange"]):
     """
@@ -1520,7 +1249,7 @@ def add_miss_class(df, miss_df_out = None, cons_col = "shenkin", thresholds = [3
             df.to_csv(miss_df_out, index = False)
     return df
 
-# ## MERGING OF TABLES ###
+### MERGING TABLES ###
 
 def merge_shenkin_df_and_mapping(shenkin_df, mapping_df, aln_ids):
     shenkin_df = shenkin_df.rename(index = str,columns = {"col": "alignment_column"}) # renaming columns to be consistent with other StruVarPi dataframes
@@ -1537,26 +1266,11 @@ def merge_shenkin_df_and_mapping(shenkin_df, mapping_df, aln_ids):
     mapped_data = pd.merge(prot_pfam_alignment, shenkin_df, left_on = "Pfam_column", right_on = "alignment_column")
     return mapped_data
 
-# ## FINAL BINDING SITE COLUMNS ADDITION TO MAIN TABLE ###
-
-def get_sifts_mapping_dict(pdb_id, sifts_dir):
-    """
-    This function creates a sifts mapping dictionary for the
-    ligand binding residues: PDB_ResNum + PDB_ChainID: UniProt_ResNum.
-    It also returns the PDB chain IDs that correspond to the protein.
-    """
-    mapping_df = pd.read_csv(os.path.join(sifts_dir, "sifts_mapping_{}.csv".format(pdb_id)))
-    mapping_df.PDB_ResNum = mapping_df.PDB_ResNum.astype(str)
-    binding_site_res = {str(row.PDB_ResNum) + row.PDB_ChainID : row.UniProt_ResNum for index, row in mapping_df.iterrows()}
-    prot_chains = mapping_df.PDB_ChainID.unique().tolist()
-    return binding_site_res, prot_chains
-
 def get_bs_residues(bs_definition, sifts_dir, arpeggio_dir):
     """
     This function creates a dictionary that indicates which residue
     numbers form each ligand binding site for each structure.
     """
-    #print(bs_definition, sifts_dir, arpeggio_dir)
     binding_site_res = {}
     for index, row in bs_definition.iterrows():
         if row.pdb_id not in binding_site_res:
@@ -1570,6 +1284,18 @@ def get_bs_residues(bs_definition, sifts_dir, arpeggio_dir):
         ress = [str(binding_res[i]) + binding_res_chain[i] for i in range(0, len(binding_res))]
         binding_site_res[row.pdb_id][row.binding_site].extend([sifts_mapping_dict[res] for res in ress])
     return binding_site_res
+
+def get_sifts_mapping_dict(pdb_id, sifts_dir):
+    """
+    This function creates a sifts mapping dictionary for the
+    ligand binding residues: PDB_ResNum + PDB_ChainID: UniProt_ResNum.
+    It also returns the PDB chain IDs that correspond to the protein.
+    """
+    mapping_df = pd.read_csv(os.path.join(sifts_dir, "sifts_mapping_{}.csv".format(pdb_id)))
+    mapping_df.PDB_ResNum = mapping_df.PDB_ResNum.astype(str)
+    binding_site_res = {str(row.PDB_ResNum) + row.PDB_ChainID : row.UniProt_ResNum for index, row in mapping_df.iterrows()}
+    prot_chains = mapping_df.PDB_ChainID.unique().tolist()
+    return binding_site_res, prot_chains
 
 def get_bs_sig_cols(strucs, bs_ids, binding_site_res, all_contact_variations):
     """
@@ -1610,12 +1336,21 @@ def add_bs_info2df(bs_sig_cols, all_contact_variations, out = None):
     bs_fingerprint = pd.DataFrame(df_sig_cols)
     bs_fingerprint.columns = l
     contact_vars_bs_sig_df = pd.concat([all_contact_variations.reset_index(), bs_fingerprint], axis=1)
-    #contact_vars_bs_sig_df = contact_vars_bs_sig_df[contact_vars_bs_sig_df.]
     if out != None:
         contact_vars_bs_sig_df.to_csv(out, index = False)
     return contact_vars_bs_sig_df
 
-# ## GETTING TOTALS ###
+def get_totals(mapped_data, prot, sifts_dir):
+    """
+    returns total variants and human occupancy of all
+    protein structure positions with residues aligned in MSA
+    """
+    coords = get_seq_range(sifts_dir, prot)
+    mapped_data_filt = mapped_data[mapped_data.UniProt_ResNum.isin(range(coords[0], coords[1]+1))]
+    mapped_data_filt = mapped_data_filt.drop_duplicates("alignment_column")
+    total_vars = mapped_data_filt.variants.sum()
+    total_occ = mapped_data_filt.human_occ.sum()
+    return (total_vars, total_occ)
 
 def get_seq_range(sifts_dir, prot):
     """
@@ -1626,19 +1361,6 @@ def get_seq_range(sifts_dir, prot):
     mapped_res = sorted(example_mapping.UniProt_ResNum.unique().tolist()) #without sorted, resulted in wrong coordinates for 5 examples
     return [mapped_res[0], mapped_res[-1]]
 
-def get_totals(mapped_data, prot, sifts_dir):
-    """
-    returns total variants and human occupancy of all
-    protein structure positions with residues aligned in MSA
-    """
-    coords = get_seq_range(sifts_dir, prot)
-    #print(coords)
-    mapped_data_filt = mapped_data[mapped_data.UniProt_ResNum.isin(range(coords[0], coords[1]+1))]
-    mapped_data_filt = mapped_data_filt.drop_duplicates("alignment_column")
-    total_vars = mapped_data_filt.variants.sum()
-    total_occ = mapped_data_filt.human_occ.sum()
-    return (total_vars, total_occ)
-
 def create_binding_site_df(struvarpi_results):
     """
     Creates binding site dataframe from StruVarPi table.
@@ -1648,9 +1370,6 @@ def create_binding_site_df(struvarpi_results):
     l_sites, l_vars, l_occ, l_vars_occ, l_mes, l_pvals, l_shenkin, l_shenkin_ci, l_mes_ci, l_bs_res = ([] for i in range(10))
     total_bs = 0
     struvarpi_df = struvarpi_results[0]                                             #first element of list contains struvarpi result df for the protein
-    #struvarpi_df_occ0 = struvarpi_df[struvarpi_df.human_occ == 0]
-    #print(len(struvarpi_df_occ0))
-    #print(struvarpi_df_occ0)
     bs_labels = [col for col in struvarpi_df.columns if col.startswith("BS")]  #list of dataframe columns that contain info about BSs
     total_vars, total_occ = struvarpi_results[1]                               #variants an occupancy of whole protein structure
     for bs_label in bs_labels: # loops through all defined binding sites in protein structure
@@ -1683,7 +1402,6 @@ def create_binding_site_df(struvarpi_results):
                 avg_shenkin = statistics.mean(shenkins)
                 shenkin_ci = 1.96*(statistics.stdev(shenkins)/math.sqrt(len(shenkins)))
             vals = [bs_vars, rest_vars, bs_occ, rest_occ]
-            #print(vals)
             se_logor = 1.96*(math.sqrt(sum(list(map((lambda x: 1/x),vals))))) #crashes if there is only one binding site
             oddsr, pval = stats.fisher_exact([[bs_vars, rest_vars], [bs_occ, rest_occ]])
             l_vars_occ.append(bs_vars/bs_occ)
@@ -1737,7 +1455,7 @@ def get_unique_bs_res(binding_site_res):
             bs_unique_res[k] = sorted(list(set(bs_unique_res[k])))
     return bs_unique_res
 
-# ## PLOTTING PART OF THE CODE ###
+### PLOTTING ###
 
 def plot_binding_site(df, cons_col = "shenkin", color = "blue", thresholds = [30,70], out = None, label = True, error = True, ylims = None, pltitle = None, show = True):
     """
@@ -1753,7 +1471,6 @@ def plot_binding_site(df, cons_col = "shenkin", color = "blue", thresholds = [30
     
     cbar = plt.colorbar()
     plt.clim(0,1)
-    #plt.colorbar()
     cbar.ax.get_yaxis().labelpad = 15
     cbar.ax.set_ylabel('p-value', fontsize = 25)# rotation = 270)
     cbar.ax.tick_params(labelsize=20)
@@ -1777,11 +1494,9 @@ def plot_binding_site(df, cons_col = "shenkin", color = "blue", thresholds = [30
         plt.title(pltitle, fontsize = 25, pad = 20)
         
     plt.tick_params(axis = 'both' , which = 'major', pad = 7.5, width = 1.9, length = 6.25, labelsize = 20)
-    #print(ylims)
     ylims_round = [round(ylim, 1) for ylim in ylims]
     lower_yticks = list(np.arange(ylims_round[0], 0, 0.25))
     higher_yticks = list(np.arange(lower_yticks[-1], ylims_round[1], 0.25))
-    #all_yticks = lower_yticks + [0, ] + higher_yticks[1:]      
     all_yticks = [round(n,2) for n in lower_yticks + [0, ] + higher_yticks[1:]]
     plt.yticks(all_yticks)
     plt.xticks(np.arange(0, 110, 10))
@@ -1796,11 +1511,9 @@ def plot_binding_site(df, cons_col = "shenkin", color = "blue", thresholds = [30
     
     if out != None:
         if os.path.isfile(out):
-            #print("Figure already exists!")
             pass
         else:
             plt.savefig(out)
-            #print("Figure was saved correctly!")
         
     if show == False:
         plt.close(fig)
@@ -1835,46 +1548,13 @@ def plot_prot_bss(df, prot, bs_color_dict, out = None, show = False, override = 
         legobj.set_edgecolor("black")
     if out != None:
         if os.path.isfile(out) and override == False:
-            #print("Figure already exists!")
             pass
         else:
             plt.savefig(out)
-            #print("Figure was saved correctly!")
     if show == False:
         plt.close(fig)
     else:
         plt.show()
-
-# ## some analysis functions ###
-
-def plot_bs_dists(bs_def_path):
-    """
-    doc
-    """
-    sample_colors = list(itertools.islice(rgbs(), 200)) # new_colours
-    
-    bs_color_dict = {}
-    for i, color in enumerate(sample_colors):
-        bs_color_dict[i] = color
-    
-    lig_bss = pd.read_csv(bs_def_path)
-    for bs, bs_df in lig_bss.groupby("binding_site"):
-        coords = bs_df[['Cartn_x', 'Cartn_y', 'Cartn_z']]
-        dists = list(pdist(coords))
-        if len(dists) == 0:
-            print("Only one ligand in BS{}".format(str(bs)))
-            continue
-        else:
-            min_dist = min(dists)
-            max_dist = max(dists)
-            bins = list(range(int(min_dist), int(max_dist)+2))
-            plt.figure()
-            plt.hist(dists, bins = bins, edgecolor="black", linewidth = 1, color = bs_color_dict[bs])
-            plt.title("Ligand distances distributions for BS{}".format(str(bs)), pad = 10)
-            plt.xlabel("Euclidean distance", labelpad = 10)
-            plt.ylabel("Absolute frequency", labelpad = 10)
-            
-            plt.show()
 
 def get_overall_stats(wd, prot, subdir, lig_data_path, bs_ids, varalign_dir, totals):
     """
@@ -1920,38 +1600,42 @@ def get_overall_stats(wd, prot, subdir, lig_data_path, bs_ids, varalign_dir, tot
             fh.write("{} human missense variants were found across {} human residues\n".format(totals[0], totals[1]))
         print("Overall stats were printed to report!")
 
-# ## DEPRECATED ###    
+### UNUSED ###
 
-def concatenate_all_coord_files(pdb_files, out):
+def get_dist_mat(lig_data_df, labs, arpeggio_dir, pdb_files):
     """
-    Concatenates a series od ProIntVar PDB tables.
+    doc
     """
-    all_atom_coords = pd.concat(
-            {
-                os.path.basename(f): PDBXreader(inputfile = f).atoms(
-                    format_type = "pdb", excluded = ()
-                )
-                for f in pdb_files}
-        ) # creates df with concatenation of atom coordinates for each file
-    all_atom_coords.index.names = ['pdb_id', ''] # sets fragment names as index of df
-    all_atom_coords.to_csv(out, index = True)
-    return all_atom_coords
+    pdb_ids = [pdb_file.split("/")[-1][:4] for pdb_file in pdb_files]
+    lig_data_df_filt = lig_data_df[lig_data_df.pdb_id.isin(pdb_ids)]
+    labs_filt = [lab for lab in labs if lab[:4] in pdb_ids]
+    print("lig_data_df == lig_data_df_filt is {}".format(lig_data_df.equals(lig_data_df_filt)))
+    print("labs == labs_filt is {}".format(labs == labs_filt))
+    sims = get_sims_matrix(lig_data_df_filt.binding_res.tolist())
+    sims_df = pd.DataFrame(sims)
+    dists_df = 1 -(sims_df)
+    return dists_df, labs_filt, lig_data_df_filt
 
-def get_average_fragment_coords(results_dir, pdb_files, lig_names):
+def get_sims_matrix(binding_ress):
     """
-    Calculates average coordinates of all ligands in the table
+    Given a set of ligand binding residues, calcualtes a
+    similarity matrix between all the different sets of ligand
+    binding residues.
     """
-    all_atom_coords_path = os.path.join(results_dir, "all_coords.csv")
-    if os.path.isfile(all_atom_coords_path):
-        #print("ALL coords df already exists!")
-        all_atom_coords = pd.read_csv(all_atom_coords_path)
-    else:
-        all_atom_coords = concatenate_all_coord_files(pdb_files, all_atom_coords_path)
-    pdb_rel_paths = [pdb_file.split("/")[-1] for pdb_file in pdb_files]
-    all_atom_coords = all_atom_coords[all_atom_coords.pdb_id.isin(pdb_rel_paths)]
-    all_ligs_coords = all_atom_coords.query('auth_comp_id in {}'.format(lig_names))
-    frag_mean_coords = residue_mean_coordinates(all_ligs_coords)
-    #frag_mean_coords = all_coords_res.query('auth_comp_id in {}'.format(lig_names)) # subsets df to keep only ligand coordinates
-    frag_mean_coords = frag_mean_coords.reset_index()
-        
-    return frag_mean_coords
+    sims = {i: {} for i in range(len(binding_ress))}
+    for i in range(len(binding_ress)):
+        sims[i][i] = 1
+        for j in range(i+1, len(binding_ress)):
+            sims[i][j] = jaccard_sim(binding_ress[i], binding_ress[j])
+            sims[j][i] = sims[i][j]
+    return sims
+
+def jaccard_sim(l1, l2):
+    """
+    Calculates Jaccard Similiarity index.
+    """
+    I = len(list(set(l1).intersection(l2)))
+    U = (len(set(l1)) + len(set(l2))) - I
+    return float(I) / U
+
+### THE END ###

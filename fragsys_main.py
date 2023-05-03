@@ -1,19 +1,19 @@
-# ## this file will contain the main fragsys function ### we need this #
+### this file contains the main fragsys function ### 
 
-import os
-import time
-import fragsys
-import importlib
-importlib.reload(fragsys)
 from fragsys import *
 
+### FRAGSYS ###
+
 def main(main_dir, prot, input_df):
-    
-    timnig_prot_dict = {"start": None, "out_loop": {}, "in_loop": {}, "end": None}
-    timnig_prot_dict["start"] = time.time()
-    timnig_prot_dict["out_loop"]["setup"] = time.time()
+    """
+    This is the main fragsys function. It carries
+    out a series of calculations and operations for
+    a protein given an input pandas dataframe and saves
+    all results to a subdirectory of the main directory
+    """
     
     ### DIRECTORIES SETUP ###
+
     wd = os.path.join(main_dir, prot)
     unsupp_cifs_dir = os.path.join(wd, "unsupp_cifs")
     unsupp_pdbs_dir = os.path.join(wd, "unsupp_pdbs")
@@ -38,9 +38,6 @@ def main(main_dir, prot, input_df):
     
     setup_dirs(dirs)
     
-    ### INTRODUCING NEW PDB CLASSIFICATION ###
-    timnig_prot_dict["out_loop"]["pdb_classification"] = time.time()
-    
     classify_pdbs(prot, main_dir)
     
     ### CONVERSION TO PDB AND STAMPING PROCESS ###
@@ -48,6 +45,7 @@ def main(main_dir, prot, input_df):
     subdirs = list(map(str, sorted([int(el) for el in os.listdir(unsupp_cifs_dir)])))
     
     sp = get_swissprot()
+
     cfg.dssp_bin = dssp_bin
     aln_fmt = "stockholm"
     
@@ -61,8 +59,7 @@ def main(main_dir, prot, input_df):
                 pass #directory exists
 
     for subdir in subdirs:
-        timnig_prot_dict["in_loop"][subdir] = {}
-        timnig_prot_dict["in_loop"][subdir]["cif_conversion"] = time.time()
+
         print("Starting to process group {} of {} in {}".format(subdir, subdirs, prot))
         
         unsupp_pdbs_subdir = os.path.join(unsupp_pdbs_dir, subdir)
@@ -77,8 +74,7 @@ def main(main_dir, prot, input_df):
         figs_subdir = os.path.join(figs_dir, subdir)
         
         print("Starting CIF to PDB conversion section!")
-        
-        
+         
         subdir_cifs = os.listdir(unsupp_cifs_subdir)
         cif2pdb_chain_dict = {}
         bio2asym_chain_dict = {}
@@ -86,19 +82,16 @@ def main(main_dir, prot, input_df):
             cif_in = os.path.join(unsupp_cifs_subdir, cif)
             pdb_out = os.path.join(unsupp_pdbs_subdir, cif[:-3] + "pdb")
             if os.path.isfile(pdb_out):
-                #print("{} already exists!".format(pdb_out))
                 pass
             else:
                 id_equiv_dict = cif2pdb(cif_in, pdb_out)
                 cif2pdb_chain_dict[cif[:4]] = id_equiv_dict
                 bio2asym_chain_dict[cif[:4]] = get_chain_dict(cif_in)
-        #return cif2pdb_chain_dict, bio2asym_chain_dict    
-        timnig_prot_dict["in_loop"][subdir]["stamping"] = time.time()
+
         print("Starting STAMP section!")
         
         domains_out = os.path.join(wd, "{}_{}_stamp.domains".format(prot, subdir))
         if os.path.isfile(domains_out):
-                #print("Domains file already exists!")
                 pass
         else:
             generate_domains(unsupp_pdbs_subdir, domains_out)
@@ -108,16 +101,13 @@ def main(main_dir, prot, input_df):
         matrix_file = prefix + "." + str(n_strucs-1)
 
         if os.path.isfile(os.path.join(stamp_out_dir, subdir, matrix_file)):
-            #print("Matrix file already exists!")
             pass
         else:
-            #print("Proceeding to run STAMP")
             ec = stamp(
                 domains_out,
                 prefix, os.path.join(wd, prefix + ".out")
             )
             if ec == 0:
-                #print("STAMP ran successfully!")
                 pass
             else:
                 print("Something went wrong with STAMP :(")
@@ -129,16 +119,13 @@ def main(main_dir, prot, input_df):
             if os.path.isfile(os.path.join(supp_pdbs_dir, subdir, file)): # only when they alaready have been transformed
                 c += 1
         if c == len(structure_files):
-            #print("Coordinate files have been correctly transformed!")
             pass
         else:
             print("Proceeding to run TRANSFORM")
             if not os.path.isfile(matrix_file): # RUNNING TRANSFORM ONCE STAMP OUTPUT HAS BEEN MOVED TO STAMP_OUT_DIR
                 matrix_file = os.path.join(stamp_out_dir, subdir, prefix + "." + str(n_strucs-1))
-                #print("Running TRANSFORM with {}".format(matrix_file))
             ec = transform(matrix_file) #running transform with matrix on cwd
             if ec == 0:
-                #print("TRANSFORM ran successfully!")
                 pass
             else:
                 print("Something went wrong with TRANSFORM :(")
@@ -148,27 +135,23 @@ def main(main_dir, prot, input_df):
         move_stamp_output(wd, prefix, stamp_out_subdir)
         
         ### PROCESSING OF STRUCTURES BEFORE PIPELINE ###
-        timnig_prot_dict["in_loop"][subdir]["lig_data"] = time.time()
+
         lig_data_path = os.path.join(wd, "{}_{}_lig_data.csv".format(prot, subdir))
         if os.path.isfile(lig_data_path):
-            #print("Lig data table already exists!")
             ligs_df = pd.read_csv(lig_data_path)
         else:
             ligs_df = get_lig_data(supp_pdbs_subdir, lig_data_path)
         
         ### PDB - UNIPROT SEQUENCE MAPPING ###
-        timnig_prot_dict["in_loop"][subdir]["sifts"] = time.time()
+
         print("Starting UNIPROT-PDB mapping section!")
         
         pdb_mappings = []
-        #print(strucs)
         strucs = [file for file in os.listdir(unsupp_pdbs_subdir) if file.endswith("_bio.pdb")]
         for struc in strucs:
-            #print(struc)
             pdb_id = struc[:4]
             dssp_csv = os.path.join(dssp_subdir, "dssp_" + struc.replace("pdb", "csv"))
             if os.path.isfile(dssp_csv):
-                #print("DSSP output already exists for {}!".format(pdb_id))
                 dssp_data = pd.read_csv(dssp_csv)
                 pass
             else:
@@ -176,15 +159,12 @@ def main(main_dir, prot, input_df):
             input_sifts = os.path.join(os.getcwd(), ".prointvar/sifts", "{}.xml".format(pdb_id))
             input_sifts_moved = os.path.join(sifts_subdir, "{}.xml".format(pdb_id))
             if os.path.isfile(input_sifts_moved):
-                #print("SIFTS already downloaded for {}!".format(pdb_id))
                 pass
             else:
                 download_sifts_from_ebi(pdb_id)
-                #print("SIFTS was downloaded correctly for {}!".format(pdb_id))
             sifts_out1 = os.path.join(sifts_subdir, "sifts_" + pdb_id + ".csv")
             sifts_out2 = os.path.join(sifts_subdir, "sifts_mapping_" + pdb_id + ".csv")
             if os.path.isfile(sifts_out1) and os.path.isfile(sifts_out2):
-                #print("SIFTS processed files exist for {}!".format(pdb_id))
                 sifts_data = pd.read_csv(sifts_out1)
                 sifts_mapping = pd.read_csv(sifts_out2)
             else:
@@ -194,7 +174,7 @@ def main(main_dir, prot, input_df):
             pdb_mappings.append(mapping)
     
         ### ARPEGGIO PART ###
-        timnig_prot_dict["in_loop"][subdir]["arpeggio"] = time.time()
+
         print("Starting ARPEGGIO section!")
         struc2ligs = {}
         for struc in strucs:
@@ -203,12 +183,10 @@ def main(main_dir, prot, input_df):
             pdb_path = os.path.join(supp_pdbs_subdir, struc)
             clean_pdb_path = pdb_path.replace(".pdb", ".clean.pdb")
             if os.path.isfile(os.path.join(clean_pdbs_subdir, struc.replace(".pdb", ".clean.pdb"))) or os.path.isfile(os.path.join(supp_pdbs_subdir, struc.replace(".pdb", ".clean.pdb"))):
-                #print("{} has already been cleaned!".format(struc[:4]))
                 pass
             else:
                 ec = run_clean_pdb(pdb_path)
                 if ec == 0:
-                    #print("{} was cleaned sucessfully!".format(struc))
                     pass
                 else:
                     print("Something went wrong when cleaning {} :(".format(struc[:4]))
@@ -222,7 +200,6 @@ def main(main_dir, prot, input_df):
                     clean_pdb_path = os.path.join(clean_pdbs_subdir, struc.replace(".pdb", ".clean.pdb"))
 
                 if os.path.isfile(os.path.join(arpeggio_subdir, struc[:-3] + "clean_{}.bs_contacts".format(the_lig))) or os.path.isfile(os.path.join(supp_pdbs_subdir, struc[:-3] + "clean_{}.bs_contacts".format(the_lig))):
-                    #print("{} exists!".format(struc[:-3] + "clean_{}.bs_contacts".format(the_lig)))
                     continue
 
                 ec = run_arpeggio(clean_pdb_path, the_lig)
@@ -241,8 +218,7 @@ def main(main_dir, prot, input_df):
                     print("Something went wrong when running Arpeggio for {} :(".format(struc[:4]))
                     pass
         move_arpeggio_output(wd, subdir, strucs, supp_pdbs_subdir, clean_pdbs_subdir, struc2ligs)
-        #print(bio2asym_chain_dict)
-        #print(cif2pdb_chain_dict)
+
         ligand_contact_list = []
         for struc in strucs:
             all_ligs = ligs_df[ligs_df.struc_name == struc].label_comp_id.unique().tolist()
@@ -250,7 +226,6 @@ def main(main_dir, prot, input_df):
             arpeggio_out1 = os.path.join(arpeggio_subdir, "arpeggio_all_cons_split_" + struc[:4] + ".csv") # output file 1
             arpeggio_out2 = os.path.join(arpeggio_subdir,  "arpeggio_lig_cons_" + struc[:4] + ".csv") # output file 2
             if os.path.isfile(arpeggio_out1) and os.path.isfile(arpeggio_out2):
-                #print("Arpeggio processed files exist for {}!".format(struc[:4]))
                 lig_cons_split = pd.read_csv(arpeggio_out1)
                 arpeggio_lig_cons = pd.read_csv(arpeggio_out2)
             else:
@@ -264,7 +239,7 @@ def main(main_dir, prot, input_df):
             ligand_contact_list.append(ligand_contact)
     
         ### BINDING SITE DEFINITION AND CHIMERA SCRIPT WRITING ###
-        timnig_prot_dict["in_loop"][subdir]["bs_definition"] = time.time()
+
         print("Starting BS definition section!")
         
         pdb_paths = [os.path.join(clean_pdbs_subdir, file) for file in os.listdir(clean_pdbs_subdir)]
@@ -275,25 +250,15 @@ def main(main_dir, prot, input_df):
         attr_out = os.path.join(results_dir, "{}.attr".format(string_name))
         chimera_script_out = os.path.join(results_dir, "{}.com".format(string_name))
         if os.path.isfile(bs_def_out) and os.path.isfile(attr_out) and os.path.isfile(chimera_script_out):
-            #print("Binding sites have been defined and files created!")
             pass
         else:
             def_bs_oc(results_dir, pdb_paths, prot, subdir, ligs, bs_def_out, attr_out, chimera_script_out, arpeggio_subdir, metric = oc_metric, dist = oc_dist, method = oc_method, alt_fmt = False)
             print("Binding sites were sucessfully defined!")
         
-        #bs_com2 = os.path.join(results_dir, "{}_{}_BS_col_OC_{}_{}_{}".format(prot, subdir, oc_method, oc_metric, oc_dist))
         bs_definition = pd.read_csv(bs_def_out)
-        #if os.path.isfile(bs_com2):
-            #print("Colouring BS script already exists!")
-        #    pass
-        #else:
-        #    create_bs_colouring_script(
-        #        bs_definition, pdb_paths, arpeggio_subdir,
-        #        sifts_subdir, bs_com2)
-        #    print("Colouring binding sites script created!")
 
         ### CONSERVATION AND VARIATION ANALYSIS
-        timnig_prot_dict["in_loop"][subdir]["cons_var"] = time.time()
+
         example_struc = os.path.join(clean_pdbs_subdir, os.listdir(clean_pdbs_subdir)[0])
         fasta_path = os.path.join(varalign_subdir, "{}_{}.fa".format(prot, subdir))
         hits_aln = fasta_path.replace("fa", "sto")
@@ -301,9 +266,7 @@ def main(main_dir, prot, input_df):
         shenkin_out = os.path.join(varalign_subdir, "{}_{}_shenkin.csv".format(prot, subdir))
         shenkin_filt_out = os.path.join(varalign_subdir, "{}_{}_shenkin_filt.csv".format(prot, subdir))
 
-
         if os.path.isfile(hits_aln_rf):
-            #print("jackhmmer MSA already exists!")
             pass
         else:
             create_alignment_from_struc(example_struc, fasta_path)
@@ -312,21 +275,19 @@ def main(main_dir, prot, input_df):
         aln_obj = Bio.AlignIO.read(hits_aln_rf, "stockholm") #crashes if target protein is not human!
         aln_info_path = os.path.join(varalign_subdir, hits_aln_rf + "_info_table.p.gz")
         if os.path.isfile(aln_info_path):
-            #print("Aln info table already exists!")
             aln_info = pd.read_pickle(aln_info_path)
         else:
             aln_info = varalign.alignments.alignment_info_table(aln_obj)
             aln_info.to_pickle(aln_info_path)
             print("Aln info was correctly created and saved!")
         aln_info_human = aln_info[aln_info.species == "HUMAN"]
-        #print("THERE ARE {} HUMAN SEQUENCES IN THE ALIGNMENT FOR {} {}".format(len(aln_info_human), prot, subdir))
+        
         if len(aln_info_human) == 0: #THERE ARE NOT ANY HUMAN HOMOLOGUES FOR THE TARGET PROTEIN
             print("There are {} sequences in the MSA for {} {}. Skipping to next protein sequence".format(len(aln_info_human), prot, subdir))
             continue
             
         human_hits_msa = os.path.join(hits_aln_rf[:-4] + "_human.sto")
         if os.path.isfile(human_hits_msa):
-            #print("Human subset MSA already exists!")
             pass
         else:
             get_human_subset_msa(hits_aln_rf, human_hits_msa)
@@ -334,10 +295,8 @@ def main(main_dir, prot, input_df):
 
         prot_cols = get_target_prot_cols(hits_aln)
         
-        #else:
         variant_table_path = os.path.join(varalign_subdir, human_hits_msa + "_human_variants.p.gz")
         if os.path.isfile(variant_table_path):
-            #print("Variant table already exists!")
             variants_table = pd.read_pickle(variant_table_path)
         else:
             variants_table = varalign.align_variants.align_variants(aln_info_human, path_to_vcf = gnomad_vcf, include_other_info = False)
@@ -346,7 +305,6 @@ def main(main_dir, prot, input_df):
 
         indexed_mapping_path = os.path.join(varalign_subdir, hits_aln_rf + '_mappings.p.gz')
         if os.path.isfile(indexed_mapping_path):
-            #print("Mapping already exists!")
             indexed_mapping_table = pd.read_pickle(indexed_mapping_path)
         else:
             indexed_mapping_table = varalign.align_variants._mapping_table(aln_info) # now contains all species
@@ -354,14 +312,12 @@ def main(main_dir, prot, input_df):
             print("Mapping table was created and saved correctly!")
 
         if os.path.isfile(shenkin_out):
-            #print("Shenkin dataframe already exists!")
             shenkin = pd.read_csv(shenkin_out)
         else:
             shenkin = calculate_shenkin(hits_aln_rf, aln_fmt, shenkin_out)
             print("Shenkin dataframe was created and saved correctly!")
 
         if os.path.isfile(shenkin_filt_out):
-            #print("Filtered Shenkin dataframe already exists!")
             shenkin_filt = pd.read_csv(shenkin_filt_out)
         else:
             shenkin_filt = get_and_format_shenkin(shenkin, prot_cols, shenkin_filt_out)
@@ -373,7 +329,6 @@ def main(main_dir, prot, input_df):
 
         miss_df_out = os.path.join(varalign_subdir, "{}_{}_missense_df.csv".format(prot, subdir))
         if os.path.isfile(miss_df_out):
-            #print("Missense datframe already exists!")
             missense_variants_df = pd.read_csv(miss_df_out)
 
         else:
@@ -397,17 +352,12 @@ def main(main_dir, prot, input_df):
         shenkin_filt["log_oddsratio"] = missense_variants_df.log_oddsratio
         shenkin_filt["pvalue"] = missense_variants_df.pvalue
         shenkin_filt["ci_dist"] = missense_variants_df.ci_dist
-        #return indexed_mapping_table
+        
         aln_ids = list(set([seqid[0] for seqid in indexed_mapping_table.index.tolist() if prot in seqid[0]])) # THIS IS EMPTY IF QUERY SEQUENCE IS NOT FOUND
-        #could change query ID to uniprot_id/coords so all of them work
-        #could change seq db to whole UNIPROT, including unreviewed
-        #could just skip if protein sequence is not reviewed
-        #print(aln_ids)
-        #return
+
         mapped_data = merge_shenkin_df_and_mapping(shenkin_filt, indexed_mapping_table, aln_ids) #does it need to be only human?
-        #return shenkin_filt, indexed_mapping_table, aln_ids
+        
         contact_variation_list = []
-        timnig_prot_dict["in_loop"][subdir]["table_merging"] = time.time()
         for pdb_mapping, ligand_contact in zip(pdb_mappings, ligand_contact_list): 
             mapped_data_pdb = mapped_data.merge(pdb_mapping, on = "UniProt_ResNum") # mapping conservation and variation data to pdb mapping for each structure
             contact_variation = mapped_data_pdb[mapped_data_pdb["PDB_ResNum"].isin(ligand_contact)] # subsetting table for ligand-interacting residues
@@ -419,45 +369,34 @@ def main(main_dir, prot, input_df):
         for structure, contact_variation in zip(strucs, contact_variation_list): # concatenate all strucutre tables 
             contact_variation['structure'] = structure[:4] # adding column indicating structure id
         all_contact_variations = pd.concat(contact_variation_list) # concatenate all different structure tables ()
-        timnig_prot_dict["in_loop"][subdir]["results_df"] = time.time()
         bs_ids = sorted(bs_definition.binding_site.unique().tolist()) #if not sorted, mapping of residues and binding sites has labeling mixed up
-        #print(bs_ids)
+        
         binding_site_res = get_bs_residues(bs_definition, sifts_subdir, arpeggio_subdir)
         bs_sig_cols = get_bs_sig_cols(strucs, bs_ids, binding_site_res, all_contact_variations)
 
         fragsys_df_path = os.path.join(results_dir, "{}_{}_fragsys_df.csv".format(prot, subdir))
         
-        #return bs_definition, sifts_subdir, arpeggio_subdir, strucs, bs_ids, binding_site_res, all_contact_variations, bs_sig_cols, all_contact_variations, fragsys_df_path
         if os.path.isfile(fragsys_df_path):
-            #print("Fragsys results dataframe already exists!")
             fragsys_df = pd.read_csv(fragsys_df_path)
         else:
             fragsys_df = add_bs_info2df(bs_sig_cols, all_contact_variations, fragsys_df_path)
             print("Fragsys results dataframe was created and saved successfully!")
     
-        #return mapped_data
-    
         totals = get_totals(mapped_data, prot, sifts_subdir)
-        #print(totals)
+
         ### BINDING SITE PLOTTING SECION ###
     
-        #return fragsys_df
-        #return [fragsys_df, totals, binding_site_res, mapped_data, prot, sifts_subdir]
-        #print(binding_site_res)
         mes_sgc_df_out = os.path.join(results_dir, "{}_{}_BS_df.csv".format(prot, subdir))
         if os.path.isfile(mes_sgc_df_out):
-            #print("Fragsys results dataframe already exists!")
             mes_sgc_df = pd.read_csv(mes_sgc_df_out)
         else:
             mes_sgc_df = create_binding_site_df([fragsys_df, totals, binding_site_res])
             mes_sgc_df.to_csv(mes_sgc_df_out, index = False)
             print("Binding site dataframe was created and saved successfully for {}_{}!".format(prot, subdir))
         mes_sgc_df, bs_unique_res = add_bs_msa_coverage(mes_sgc_df, fragsys_df, binding_site_res)
-        #print(bs_unique_res)
         df_prot_miss = pd.read_csv(miss_df_out)
         df_prot_miss = df_prot_miss[df_prot_miss.occ > 0]
         mes_sgc_df_filt = mes_sgc_df[(mes_sgc_df.vars != 0) & (mes_sgc_df.occ != 0) & (mes_sgc_df.shenkin_ci != 0)&(mes_sgc_df.number_bs_res > 1)] # filter df to get rid of sites with 0 variants and other anomalies
-        timnig_prot_dict["in_loop"][subdir]["plotting"] = time.time()
         sample_colors = list(itertools.islice(rgbs(), 200)) # new_colours
         bs_color_dict = {}
         for i, color in enumerate(sample_colors):
@@ -489,109 +428,13 @@ def main(main_dir, prot, input_df):
             out, show = False, override = False
         )
 
-    #for subdir in subdirs:    
         get_overall_stats(wd, prot, subdir, lig_data_path, bs_ids, varalign_subdir, totals)
     
         
         print("Fragsys has finished running for group {} of {}!".format(subdir, prot))
-        timnig_prot_dict["in_loop"][subdir]["end"] = time.time()
-    timnig_prot_dict["end"] = time.time()
+
     print("Fragsys has finished running for {}!".format(prot))
-    return timnig_prot_dict#, mes_sgc_df_filt
 
-
-def just_run_arpeggio(wd, prot):
-    
-    ### DIRECTORIES SETUP ###
-    
-    unsupp_cifs_dir = os.path.join(wd, "unsupp_cifs")
-    unsupp_pdbs_dir = os.path.join(wd, "unsupp_pdbs")
-    clean_pdbs_dir = os.path.join(wd, "clean_pdbs")
-    results_dir = os.path.join(wd, "results")
-    pdb_clean_dir = os.path.join(results_dir, "pdb_clean")
-    arpeggio_dir = os.path.join(results_dir, "arpeggio")
-
-    dirs = [
-            unsupp_cifs_dir, unsupp_pdbs_dir, clean_pdbs_dir,
-            results_dir, pdb_clean_dir, arpeggio_dir
-        ]
-
-    setup_dirs(dirs)
-    
-    ### CONVERSION TO PDB AND STAMPING PROCESS ###
-    
-    for cif in os.listdir(unsupp_cifs_dir):
-        cif_in = os.path.join(unsupp_cifs_dir, cif)
-        pdb_out = os.path.join(unsupp_pdbs_dir, cif[:-3] + "pdb")
-        if os.path.isfile(pdb_out):
-            #print("{} already exists!".format(pdb_out))
-            pass
-        else:
-            cif2pdb(cif_in, pdb_out)
-        
-    ### PROCESSING OF STRUCTURES BEFORE PIPELINE ###
-    
-    lig_data_path = os.path.join(wd, "lig_data.csv")
-    if os.path.isfile(lig_data_path):
-        print("Lig data table already exists!")
-        ligs_df = pd.read_csv(lig_data_path)
-    else:
-        ligs_df = get_lig_data(unsupp_pdbs_dir, lig_data_path)
-        
-    ### ARPEGGIO PART ###
-    struc2ligs = {}
-    strucs = ligs_df.struc_name.unique().tolist()
-    for struc in strucs:
-        struc2ligs[struc] = []
-        struc_df = ligs_df[ligs_df.struc_name == struc]
-        pdb_path = os.path.join(unsupp_pdbs_dir, struc)
-        clean_pdb_path = pdb_path.replace(".pdb", ".clean.pdb")
-        if os.path.isfile(os.path.join(clean_pdbs_dir, struc.replace(".pdb", ".clean.pdb"))):
-            pass
-        else:
-            ec = run_clean_pdb(pdb_path)
-            if ec == 0:
-                pass
-            else:
-                print("Something went wrong when cleaning {} :(".format(struc[:4]))
-                pass
-        ligs = struc_df.label_comp_id.unique().tolist()
-        for the_lig in ligs: # RUNs ARPEGGIO ONCE FOR EACH LIGAND
-            struc2ligs[struc].append(the_lig)
-            
-            if not os.path.isfile(clean_pdb_path):
-                clean_pdb_path = os.path.join(clean_pdbs_dir, struc.replace(".pdb", ".clean.pdb"))
-                
-            if os.path.isfile(os.path.join(arpeggio_dir, struc[:-3] + "clean_{}.bs_contacts".format(the_lig))) or os.path.isfile(os.path.join(clean_pdbs_dir, struc[:-3] + "clean_{}.bs_contacts".format(the_lig))):
-                continue
-            
-            ec = run_arpeggio(clean_pdb_path, the_lig)
-            if ec == 0:
-                print("Arpeggio ran sucessfully for {} in {}!".format(the_lig, struc[:4]))
-                for arpeggio_suff in arpeggio_suffixes: # CHANGES ARPEGGIO OUTPUT FILENAMES SO THEY INCLUDE LIGAND NAME
-                    arpeggio_file_old_name_supp = os.path.join(unsupp_pdbs_dir, struc[:-3] + "clean" + "." + arpeggio_suff)
-                    arpeggio_file_new_name_supp = os.path.join(unsupp_pdbs_dir, struc[:-3] + "clean_{}".format(the_lig) + "." + arpeggio_suff) ### RE-NAMING IS WORKING
-                    arpeggio_file_old_name_clean = os.path.join(clean_pdbs_dir, struc[:-3] + "clean" + "." + arpeggio_suff)
-                    arpeggio_file_new_name_clean = os.path.join(clean_pdbs_dir, struc[:-3] + "clean_{}".format(the_lig) + "." + arpeggio_suff)
-                    if os.path.isfile(arpeggio_file_old_name_supp):
-                        os.rename(arpeggio_file_old_name_supp, arpeggio_file_new_name_supp)
-                    elif os.path.isfile(arpeggio_file_old_name_clean):
-                        os.rename(arpeggio_file_old_name_clean, arpeggio_file_new_name_clean)
-            else:
-                print("Something went wrong when running Arpeggio for {} :(".format(struc[:4]))
-                pass
-    move_arpeggio_output(strucs, unsupp_pdbs_dir, clean_pdbs_dir, struc2ligs)
-    ligand_contact_list = []
-    strucs = ligs_df.struc_name.unique().tolist()
-    for struc in strucs:
-        lig = ligs_df[ligs_df.struc_name == struc].label_comp_id.unique().tolist()[0] ### USES ONLY FIRST LIGAND OF INTEREST ###
-        all_ligs = ligs_df[ligs_df.struc_name == struc].label_comp_id.unique().tolist()
-        arpeggio_out1 = os.path.join(arpeggio_dir,  "arpeggio_all_cons_split_" + struc[:4] + ".csv") # output file 1
-        arpeggio_out2 = os.path.join(arpeggio_dir,  "arpeggio_lig_cons_" + struc[:4] + ".csv") # output file 2
-        if os.path.isfile(arpeggio_out1) and os.path.isfile(arpeggio_out2):
-            lig_cons_split = pd.read_csv(arpeggio_out1)
-            arpeggio_lig_cons = pd.read_csv(arpeggio_out2)
-        else:
-            lig_cons_split, arpeggio_lig_cons = process_arpeggio(struc, all_ligs, clean_pdbs_dir, arpeggio_dir) ### NOW PROCESSES ALL LIGANDS ###
-            print("Arpeggio output being processed for {}!".format(struc[:4]))
     return
+
+### THE END ###

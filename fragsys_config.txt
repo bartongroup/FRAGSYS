@@ -1,4 +1,4 @@
-### FRAGSYS CONFIG FILE ### hello
+### FRAGSYS CONFIG FILE ###
 [binaries]
 dssp_bin = /cluster/gjb_lab/2394007/miniconda/envs/msa/bin/mkdssp
 stamp_bin = /cluster/gjb_lab/2394007/stamp_new/stamp.4.5/bin/linux/stamp
@@ -17,3 +17,5 @@ mes_sig_t = 0.2
 oc_dist = 0.66
 oc_metric = i_rel
 oc_method = single
+
+### END OF CONFIG FILE ###
