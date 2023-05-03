@@ -1,0 +1,19 @@
+### FRAGSYS CONFIG FILE ### hello
+[binaries]
+dssp_bin = /cluster/gjb_lab/2394007/miniconda/envs/msa/bin/mkdssp
+stamp_bin = /cluster/gjb_lab/2394007/stamp_new/stamp.4.5/bin/linux/stamp
+transform_bin = /cluster/gjb_lab/2394007/stamp_new/stamp.4.5/bin/linux/transform
+clean_pdb_python_bin = /cluster/gjb_lab/2394007/miniconda/envs/arpeggio/bin/python
+clean_pdb_bin = /cluster/gjb_lab/2394007/pandda_analysis/clean_pdb.py
+arpeggio_python_bin = /cluster/gjb_lab/2394007/miniconda/envs/arpeggio/bin/python
+arpeggio_bin = /homes/2394007/SM_VarAlign/arpeggio/arpeggio.py
+[dbs]
+gnomad_vcf = /homes/smacgowan/NOBACK/resources/gnomad/gnomad.exomes.r2.0.1.sites.vcf.gz
+swissprot = /cluster/gjb_lab/2394007/data/all_species/swissprot_rev_Nov21.fasta
+[other]
+stampdir = /cluster/gjb_lab/2394007/stamp_new/stamp.4.5/defs/
+mes_sig_t = 0.2
+[clustering]
+oc_dist = 0.66
+oc_metric = i_rel
+oc_method = single
