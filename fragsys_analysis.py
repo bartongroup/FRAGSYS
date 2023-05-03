@@ -20,6 +20,7 @@ from color_library import *
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from IPython.display import display
+from scipy.spatial.distance import euclidean
 #from statannotations.Annotator import Annotator seaborn version inconsistency
 
 ### THE VARIABLES ###
@@ -184,6 +185,32 @@ def run_tests(d):
     s, p = scipy.stats.ttest_ind(a, b)
     print("T-test result:\nT = {}\tp = {}".format(round(s,2), round(p,2)))
 
+#def get_rsa_profiles(bss_df, ress_df):
+#    """
+#    Returns a dictionary containint the binding site IDs as keys,
+#    and the site RSA profile as value. This is a list containing
+#    the RSA values of the residues forming the site.
+#    """
+#    prots = bss_df.protein.unique().tolist()
+#    rsa_profs = {}
+#    for prot in prots:
+#        prot_groups = sorted(bss_df.query('protein == @prot').group.unique().tolist())
+#        for group in prot_groups:
+#            prot_group_ress = ress_df.query('protein == @prot & group == @group')
+#            if len(prot_group_ress) == 0:
+#                print("Group {} of {} has 0 residues. Skipping!".format(group, prot))
+#                continue
+#            prot_bs_ids = sorted(bss_df.query('protein == @prot & group == @group').bs_id.unique().tolist())
+#            for prot_bs_id in prot_bs_ids:
+#                prot_bs_ress = prot_group_ress[prot_group_ress[prot_bs_id] == 1]
+#                if len(prot_bs_ress) == 0:
+#                    print("0 res at {} of group {} of {}".format(prot_bs_id, group, prot))
+#                    continue
+#                bs_rsas = prot_bs_ress.RSA.tolist()
+#                dk = "{}_{}_{}".format(prot, group, prot_bs_id)
+#                rsa_profs[dk] = sorted([round(el, 1) for el in bs_rsas])
+#    return rsa_profs
+
 def get_rsa_profiles(bss_df, ress_df):
     """
     Returns a dictionary containint the binding site IDs as keys,
@@ -192,6 +219,7 @@ def get_rsa_profiles(bss_df, ress_df):
     """
     prots = bss_df.protein.unique().tolist()
     rsa_profs = {}
+    #rsa_profs_lens = []
     for prot in prots:
         prot_groups = sorted(bss_df.query('protein == @prot').group.unique().tolist())
         for group in prot_groups:
@@ -202,13 +230,15 @@ def get_rsa_profiles(bss_df, ress_df):
             prot_bs_ids = sorted(bss_df.query('protein == @prot & group == @group').bs_id.unique().tolist())
             for prot_bs_id in prot_bs_ids:
                 prot_bs_ress = prot_group_ress[prot_group_ress[prot_bs_id] == 1]
+                prot_bs_ress = prot_bs_ress.drop_duplicates(["protein", "UniProt_ResNum", "UniProt_ResName"])
+                #rsa_profs_lens.append(len(prot_bs_ress))
                 if len(prot_bs_ress) == 0:
                     print("0 res at {} of group {} of {}".format(prot_bs_id, group, prot))
                     continue
                 bs_rsas = prot_bs_ress.RSA.tolist()
                 dk = "{}_{}_{}".format(prot, group, prot_bs_id)
                 rsa_profs[dk] = sorted([round(el, 1) for el in bs_rsas])
-    return rsa_profs
+    return rsa_profs#, rsa_profs_lens
 
 def get_U(a, b):
     """

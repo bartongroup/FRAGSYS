@@ -180,13 +180,13 @@ def get_confidences_df(preds_l, round_preds_l, vals_l):
     
     return conf_df, conf_df_sum
 
-def plot_conf_acc_cov(conf_df_sum):
+def plot_conf_acc_cov(conf_df_sum, f_size = (5, 5), dpi = 100, out = None):
     """
     plots confidence vs coverage and accuracy
     for the cross-validation of a neural network
     """
     # create figure and axis objects with subplots()
-    fig, ax = plt.subplots(figsize=(5, 5), dpi=100)
+    fig, ax = plt.subplots(figsize = f_size, dpi = dpi)
     # make a plot
     ax.plot(conf_df_sum["conf"],
             conf_df_sum["cov"],
@@ -197,22 +197,25 @@ def plot_conf_acc_cov(conf_df_sum):
     ax.set_xlabel("Confidence score", fontsize = 14)
     # set y-axis label
     ax.set_ylabel("Coverage",
-                  color="k",
+                  color="darkgreen",
                   fontsize=14)
     
-    #ax.set_yticks(np.arange(0.2,1.1, 0.1))
-    #ax.set_ylim(0.175,1.025)
+    #ax.set_yticks(np.arange(0.3,1.1, 0.1))
+    #ax.set_ylim(0.339, 1.01)
     #plt.legend()
     # twin object for two different y-axis on the sample plot
     ax2=ax.twinx()
     # make a plot with different y-axis using second axis object
     ax2.plot(conf_df_sum["conf"], conf_df_sum["acc"],color="purple",marker="D", label = "Average accuracy", markeredgewidth = 1, markeredgecolor = "k")
-    ax2.set_ylabel("Average accuracy",color="k",fontsize=14)
+    ax2.set_ylabel("Average accuracy",color="purple",fontsize=14)
     ax2.set_xlabel("Average confidence",color="k",fontsize=14)
-    #ax2.set_yticks(np.arange(0.85,1.05, 0.05))
-    #ax2.set_ylim(0.845,1.005)
+    #ax2.set_yticks(np.arange(0.90, 1.02, 0.02))
+    #ax2.set_ylim(0.89, 1)
     #plt.legend()
-    plt.xticks(range(0,11))
+    plt.xticks(range(0, 10))
+    #plt.xlim(-0.5, 9.5)
+    if out != None:
+        plt.savefig(out)
     plt.show()
 
 def get_confidences_df_blind(preds, round_preds, vals):
