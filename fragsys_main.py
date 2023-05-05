@@ -84,7 +84,7 @@ def main(main_dir, prot, input_df):
             if os.path.isfile(pdb_out):
                 pass
             else:
-                id_equiv_dict = cif2pdb(cif_in, pdb_out)
+                id_equiv_dict = cif2pdb(cif_in, pdb_out) # only generated if files do not exist
                 cif2pdb_chain_dict[cif[:4]] = id_equiv_dict
                 bio2asym_chain_dict[cif[:4]] = get_chain_dict(cif_in)
 
@@ -161,7 +161,11 @@ def main(main_dir, prot, input_df):
             if os.path.isfile(input_sifts_moved):
                 pass
             else:
-                download_sifts_from_ebi(pdb_id)
+                try:
+                    download_sifts_from_ebi(pdb_id)
+                except:
+                    print("ERROR: SIFTS not found for {}!".format(pdb_id))
+                    continue
             sifts_out1 = os.path.join(sifts_subdir, "sifts_" + pdb_id + ".csv")
             sifts_out2 = os.path.join(sifts_subdir, "sifts_mapping_" + pdb_id + ".csv")
             if os.path.isfile(sifts_out1) and os.path.isfile(sifts_out2):
