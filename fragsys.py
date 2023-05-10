@@ -734,7 +734,7 @@ def contact_type(row):
 
 ### BINDING SITE DEFINITION ###
 
-def def_bs_oc(results_dir, pdb_files, prot, subdir, lig_names, bs_def_out, attr_out, chimera_script_out, arpeggio_dir, metric = "i_rel", dist = 0.66, method = "complete", alt_fmt = False):
+def def_bs_oc(results_dir, pdb_files, prot, subdir, lig_names, bs_def_out, attr_out, chimera_script_out, arpeggio_dir, metric = oc_metric, dist = oc_dist, method = oc_method, alt_fmt = False):
     """
     given a set of pdb structures, and other arguments, clusters ligands in space,
     defines binding sites and writes chimera attribute files and chimera script to
@@ -802,7 +802,7 @@ def generate_ligs_res_df(arpeggio_dir, alt_fmt = False):
     labs = [pdbs[i] + "_" + str(ligs[i]) + "_" + str(resnums[i]) + "_" + str(chains[i]) for i in range(len(ligs))]
     return lig_data_df, labs
 
-def get_dis_file(lig_data_df, labs, out, metric = "i_rel"):
+def get_dis_file(lig_data_df, labs, out, metric = oc_metric):
     """
     creates dis file to be fed to OC
     """
@@ -865,7 +865,7 @@ def intersection(l1, l2):
     I = len(list(set(l1).intersection(l2)))
     return I
 
-def oc(oc_in, type_mat = "sim", method = "complete", cut_t = 0.66):
+def oc(oc_in, type_mat = "sim", method = oc_method, cut_t = oc_dist):
     """
     runs OC and returns exit code, should be 0 if all is ok
     """
