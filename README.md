@@ -2,7 +2,6 @@
 This repository contains the fragment screeening analysis pipeline (**FRAGSYS**) used in *INSERT_PAPER_REF*. On this main folder, we can find 5 directories, and 5 files.
 ## Files
 There are 5 different files on this repository main directory. Three of these are python libraries, then a notebook, and a configuration file.
-  +  NEED TO REMOVE color_library.py
   +  [`fragsys_config.txt`](fragsys_config.txt) contains the default parameters to run **FRAGSYS** and it is read by [`fragsys.py`](fragsys.py).
   +  [`fragsys.py`](fragsys.py) contains all the function, lists and dictionaries needed to run the pipeline.
   +  [`fragsys_main.py`](fragsys_main.py) contains the main **FRAGSYS** function, where all functions in [`fragsys.py`](fragsys.py) are called. This script represents the pipeline itself.
