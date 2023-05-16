@@ -7,6 +7,7 @@ import scipy
 import pickle
 import random
 import sklearn
+import colorsys
 import itertools
 import matplotlib
 import statistics
@@ -16,16 +17,13 @@ import seaborn as sns
 from PIL import Image
 from scipy import stats
 from pathlib import Path
-from color_library import *
+from fractions import Fraction
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
+from typing import Iterable, Tuple
 from IPython.display import display
 from scipy.spatial.distance import euclidean
-#from statannotations.Annotator import Annotator seaborn version inconsistency
-
-### THE VARIABLES ###
-
-sample_colors = list(itertools.islice(rgbs(), 200)) # list of colours
+#from statannotations.Annotator import Annotator # seaborn version inconsistency
 
 ### THE FUNCTIONS ###
 
@@ -185,32 +183,6 @@ def run_tests(d):
     s, p = scipy.stats.ttest_ind(a, b)
     print("T-test result:\nT = {}\tp = {}".format(round(s,2), round(p,2)))
 
-#def get_rsa_profiles(bss_df, ress_df):
-#    """
-#    Returns a dictionary containint the binding site IDs as keys,
-#    and the site RSA profile as value. This is a list containing
-#    the RSA values of the residues forming the site.
-#    """
-#    prots = bss_df.protein.unique().tolist()
-#    rsa_profs = {}
-#    for prot in prots:
-#        prot_groups = sorted(bss_df.query('protein == @prot').group.unique().tolist())
-#        for group in prot_groups:
-#            prot_group_ress = ress_df.query('protein == @prot & group == @group')
-#            if len(prot_group_ress) == 0:
-#                print("Group {} of {} has 0 residues. Skipping!".format(group, prot))
-#                continue
-#            prot_bs_ids = sorted(bss_df.query('protein == @prot & group == @group').bs_id.unique().tolist())
-#            for prot_bs_id in prot_bs_ids:
-#                prot_bs_ress = prot_group_ress[prot_group_ress[prot_bs_id] == 1]
-#                if len(prot_bs_ress) == 0:
-#                    print("0 res at {} of group {} of {}".format(prot_bs_id, group, prot))
-#                    continue
-#                bs_rsas = prot_bs_ress.RSA.tolist()
-#                dk = "{}_{}_{}".format(prot, group, prot_bs_id)
-#                rsa_profs[dk] = sorted([round(el, 1) for el in bs_rsas])
-#    return rsa_profs
-
 def get_rsa_profiles(bss_df, ress_df):
     """
     Returns a dictionary containint the binding site IDs as keys,
@@ -313,14 +285,14 @@ def plot_color_dd(dist_mat, clust_method, dist_t, sample_colors, out = None, sho
     dd_c_labs = [site_cluster_dict[i] for i in dd_labs]
     ordered_labs = list(dict(zip(dd_c_labs,dd_c_labs)))
     n_clusters = len(ordered_labs)
-    scipy.cluster.hierarchy.set_link_color_palette([matplotlib.colors.to_hex(sample_colors[i]) for i in ordered_labs])
+    scipy.cluster.hierarchy.set_link_color_palette([matplotlib.colors.to_hex(sample_colors[i-1]) for i in ordered_labs])
     if out!= None:
         plt.savefig(out)
     if show == True:
         plt.show()
     return site_cluster_dict, cluster_ids, n_clusters
 
-def process_heatmap_df(rsas_profs_hmap, rsas_profs_lens, cluster_dict, K):
+def process_heatmap_df(rsas_profs_hmap, rsas_profs_lens, cluster_dict, c_labs):
     """
     does some data processing to prepare a simple dataframe
     to be plotted as we need to represent the ligand
@@ -328,10 +300,10 @@ def process_heatmap_df(rsas_profs_hmap, rsas_profs_lens, cluster_dict, K):
     """
     heatmap_df = pd.DataFrame(rsas_profs_hmap).T
     sorted_dfs = []
-    for c in range(0, K):
-        c_labs = [k for k, v in cluster_dict.items() if v == c]
+    for c in c_labs:
+        c_ids = [k for k, v in cluster_dict.items() if v == c]
         sorted_c_keys = list({k: v for k, v in sorted({k2:v2 for k2, v2 in rsas_profs_lens.items() if cluster_dict[k2] == c}.items(), key=lambda item: item[1])}.keys())
-        heatmap_df_c = heatmap_df.loc[c_labs,:]
+        heatmap_df_c = heatmap_df.loc[c_ids,:]
 
         sorterIndex = dict(zip(sorted_c_keys, range(len(sorted_c_keys))))
         heatmap_df_c['Tm_Rank'] = heatmap_df_c.index.map(sorterIndex)
@@ -353,7 +325,7 @@ def get_rsa_t_poss(sorted_len_heatmap_df, rsa_t = 33.33):
         
     return rsa_t_poss
 
-def plot_heatmaps(sorted_len_heatmap_df, rsa_t_poss, n_clusters, nks, fsize = (10, 30), dpi = 300, cmap = "cividis", out = None, show = False, rsa_t_lw = 5):
+def plot_heatmaps(sorted_len_heatmap_df, rsa_t_poss, c_labs, nks, fsize = (10, 30), dpi = 300, cmap = "cividis", out = None, show = False, rsa_t_lw = 5):
     """
     does the plotting itself of the ligand
     binding site RSA-based clusters
@@ -365,7 +337,7 @@ def plot_heatmaps(sorted_len_heatmap_df, rsa_t_poss, n_clusters, nks, fsize = (1
     ax.set_xlim(0, 45)
     ax.xaxis.set_ticks_position('top') # the rest is the same
     
-    for i in range(n_clusters):
+    for i, c_lab in enumerate(c_labs):
         if i == 0:
             start_index = 0
             end_index = nks[i]
@@ -384,18 +356,18 @@ def plot_heatmaps(sorted_len_heatmap_df, rsa_t_poss, n_clusters, nks, fsize = (1
     if show == False:
         plt.close()
         
-def plot_clusters(rsas_profs_hmap, rsas_profs_lens, cluster_dict, nks, n_clusters, rsa_t = 33.33, fsize = (10, 30), dpi = 300, cmap = "cividis", out = None, show = False, rsa_t_lw = 5):
+def plot_clusters(rsas_profs_hmap, rsas_profs_lens, cluster_dict, nks, c_labs, rsa_t = 33.33, fsize = (10, 30), dpi = 300, cmap = "cividis", out = None, show = False, rsa_t_lw = 5):
     """
     this functions does the data preprocessing
     necessary to plot the RSA-based ligand binding
     site clusters and does the plotting itself as well
     """
     
-    sorted_len_heatmap_df = process_heatmap_df(rsas_profs_hmap, rsas_profs_lens, cluster_dict, n_clusters)
+    sorted_len_heatmap_df = process_heatmap_df(rsas_profs_hmap, rsas_profs_lens, cluster_dict, c_labs)
     
     rsa_t_poss = get_rsa_t_poss(sorted_len_heatmap_df, rsa_t)
     
-    plot_heatmaps(sorted_len_heatmap_df, rsa_t_poss, n_clusters, nks, fsize, dpi, cmap, out, show, rsa_t_lw)
+    plot_heatmaps(sorted_len_heatmap_df, rsa_t_poss, c_labs, nks, fsize, dpi, cmap, out, show, rsa_t_lw)
 
 def plot_boxes(df, x, y, order, pairs, col_palette, flierprops, fsize = (5, 5), dpi = 100, annotate = False, ann_loc = "inside", out = None, show = True):
     """
@@ -458,5 +430,62 @@ def get_OR(df, idx, t_row):
         df.loc[i_row, "pvalue"] = round(pval, 2)
         df.loc[i_row, "ci_dist"] = round(se_logor, 2)
     return df
+
+### COLOURS ###
+
+# This code I did not write, I grabbed it from the following URL:
+
+# https://stackoverflow.com/questions/470690/how-to-automatically-generate-n-distinct-colors
+
+def zenos_dichotomy() -> Iterable[Fraction]:
+    """
+    http://en.wikipedia.org/wiki/1/2_%2B_1/4_%2B_1/8_%2B_1/16_%2B_%C2%B7_%C2%B7_%C2%B7
+    """
+    for k in itertools.count():
+        yield Fraction(1,2**k)
+
+def fracs() -> Iterable[Fraction]:
+    """
+    [Fraction(0, 1), Fraction(1, 2), Fraction(1, 4), Fraction(3, 4), Fraction(1, 8), Fraction(3, 8), Fraction(5, 8), Fraction(7, 8), Fraction(1, 16), Fraction(3, 16), ...]
+    [0.0, 0.5, 0.25, 0.75, 0.125, 0.375, 0.625, 0.875, 0.0625, 0.1875, ...]
+    """
+    yield Fraction(0)
+    for k in zenos_dichotomy():
+        i = k.denominator # [1,2,4,8,16,...]
+        for j in range(1,i,2):
+            yield Fraction(j,i)
+
+# can be used for the v in hsv to map linear values 0..1 to something that looks equidistant
+# bias = lambda x: (math.sqrt(x/3)/Fraction(2,3)+Fraction(1,3))/Fraction(6,5)
+
+HSVTuple = Tuple[Fraction, Fraction, Fraction]
+RGBTuple = Tuple[float, float, float]
+
+def hue_to_tones(h: Fraction) -> Iterable[HSVTuple]:
+    for s in [Fraction(6,10)]: # optionally use range
+        for v in [Fraction(8,10),Fraction(5,10)]: # could use range too
+            yield (h, s, v) # use bias for v here if you use range
+
+def hsv_to_rgb(x: HSVTuple) -> RGBTuple:
+    return colorsys.hsv_to_rgb(*map(float, x))
+
+flatten = itertools.chain.from_iterable
+
+def hsvs() -> Iterable[HSVTuple]:
+    return flatten(map(hue_to_tones, fracs()))
+
+def rgbs() -> Iterable[RGBTuple]:
+    return map(hsv_to_rgb, hsvs())
+
+def rgb_to_css(x: RGBTuple) -> str:
+    uint8tuple = map(lambda y: int(y*255), x)
+    return "rgb({},{},{})".format(*uint8tuple)
+
+def css_colors() -> Iterable[str]:
+    return map(rgb_to_css, rgbs())
+
+### THE VARIABLES ###
+
+sample_colors = list(itertools.islice(rgbs(), 200)) # list of colours
 
 ### THE END ###
