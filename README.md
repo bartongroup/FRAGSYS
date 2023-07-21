@@ -1,5 +1,11 @@
 # FRAGSYS
-This repository contains the fragment screeening analysis pipeline (**FRAGSYS**) used for the analysis of our manuscript _Classification of likely functional state for ligand binding sites identified from fragment screening_ submitted to the journal [Nature Communications](https://www.nature.com/ncomms/), which can be found in their preprint server here: *INSERT_PAPER_REF*. On this main folder, we can find 5 directories, and 5 files.
+This repository contains the fragment screeening analysis pipeline (**FRAGSYS**) used for the analysis of our manuscript _Classification of likely functional state for ligand binding sites identified from fragment screening_ submitted to the journal [Nature Communications](https://www.nature.com/ncomms/), which can be found in their preprint server here: *INSERT_PAPER_REF*. 
+
+On this main folder, we can find 5 directories, and 5 files.
+
+FRAGSYS, i.e., our pipeline for the analysis of binding sites, can be executed from the jupyter notebook [`running_fragsys.ipynb`](running_fragsys.ipynb). The input for this pipeline is a list of protein [UniProt](https://www.uniprot.org/) accession identifiers.
+
+
 ## Files
 There are 5 different files on this repository main directory. Three of these are python libraries, then a notebook, and a configuration file.
   +  [`fragsys_config.txt`](fragsys_config.txt) contains the default parameters to run **FRAGSYS** and it is read by [`fragsys.py`](fragsys.py).
