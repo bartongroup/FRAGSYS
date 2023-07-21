@@ -410,25 +410,34 @@ def plot_reg_boxes(x_reg, y_reg, x_box, y_box, binns, xlab, ylab, f_size = (7.5,
     if show == False:
         plt.close()
 
-def get_OR(df, idx, t_row):
+def get_OR(df, idx, t_row, base_log = None):
     """
     calculates enrichment in functional
     sites per RSA cluster
     """
     for i_row in idx:
         i_kf = df.loc[i_row, "kf"]
-        i_tot = df.loc[i_row, "tot"]
+        i_not_kf = df.loc[i_row, "uf"]
         rest_kf = df.kf.sum() - i_kf
-        rest_tot = df.tot.sum() - i_tot
-        oddsr, pval = stats.fisher_exact([[i_kf, rest_kf], [i_tot, rest_tot]])
-        vals = [i_kf, rest_kf, i_tot, rest_tot]
+        rest_not_kf = df.uf.sum() - i_not_kf
+        oddsr, pval = stats.fisher_exact([[i_kf, rest_kf], [i_not_kf, rest_not_kf]])
+        vals = [i_kf, rest_kf, i_not_kf, rest_not_kf]
         print(i_row, vals)
         se_logor = 1.96*(math.sqrt(sum(list(map((lambda x: 1/x), vals)))))
-        logor = math.log(oddsr)
+        if base_log == None:
+            logor = math.log(oddsr)
+        else:
+            logor = math.log(oddsr, base_log)
+        lo_95ci_or = math.e**(math.log(oddsr) - se_logor)
+        hi_95ci_or = math.e**(math.log(oddsr) + se_logor)
         df.loc[i_row, "oddsratio"] = round(oddsr, 2)
         df.loc[i_row, "log_oddsratio"] = round(logor, 2)
         df.loc[i_row, "pvalue"] = round(pval, 2)
         df.loc[i_row, "ci_dist"] = round(se_logor, 2)
+        df.loc[i_row, "lo_95ci_or"] = round(lo_95ci_or, 2)
+        df.loc[i_row, "hi_95ci_or"] = round(hi_95ci_or, 2)
+        df.loc[i_row, "lo_95ci_or_dist"] = round(oddsr-lo_95ci_or, 2)
+        df.loc[i_row, "hi_95ci_or_dist"] = round(hi_95ci_or-oddsr, 2)
     return df
 
 ### COLOURS ###

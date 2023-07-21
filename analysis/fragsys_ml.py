@@ -180,7 +180,7 @@ def get_confidences_df(preds_l, round_preds_l, vals_l):
     
     return conf_df, conf_df_sum
 
-def plot_conf_acc_cov(conf_df_sum, f_size = (5, 5), dpi = 100, out = None):
+def plot_conf_acc_cov(conf_df_sum, max_xtick = 10, f_size = (5, 5), dpi = 100, out = None):
     """
     plots confidence vs coverage and accuracy
     for the cross-validation of a neural network
@@ -212,7 +212,7 @@ def plot_conf_acc_cov(conf_df_sum, f_size = (5, 5), dpi = 100, out = None):
     #ax2.set_yticks(np.arange(0.90, 1.02, 0.02))
     #ax2.set_ylim(0.89, 1)
     #plt.legend()
-    plt.xticks(range(0, 10))
+    plt.xticks(range(0, max_xtick))
     #plt.xlim(-0.5, 9.5)
     if out != None:
         plt.savefig(out)
