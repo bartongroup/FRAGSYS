@@ -1,5 +1,23 @@
 # FRAGSYS
-This repository contains the fragment screeening analysis pipeline (**FRAGSYS**) used for the analysis of our manuscript _Classification of likely functional state for ligand binding sites identified from fragment screening_ submitted to the journal [Nature Communications](https://www.nature.com/ncomms/), which can be found in their preprint server here: *INSERT_PAPER_REF*. 
+This repository contains the fragment screeening analysis pipeline (**FRAGSYS**) used for the analysis of our manuscript [_Classification of likely functional state for ligand binding sites identified from fragment screening_](https://doi.org/10.21203/rs.3.rs-3185838/v1) submitted to the journal [Nature Communications](https://www.nature.com/ncomms/).
+
+Third party dependencies for this pipeline include:
+- [DSSP](https://swift.cmbi.umcn.nl/gv/dssp/)
+- [Hmmer](http://hmmer.org/)
+- [ProIntVar](https://github.com/bartongroup/prointvar)
+- [ProteoFAV](https://github.com/bartongroup/ProteoFAV)
+- [VarAlign](https://github.com/bartongroup/SM_varalign)
+
+Other standard python libraries:
+- [Biopython](https://biopython.org/)
+- [Keras](https://keras.io/)
+- [Matplotlib](https://matplotlib.org/)
+- [Numpy](https://numpy.org/)
+- [Pandas](https://pandas.pydata.org/)
+- [Scipy](https://scipy.org/)
+- [Seaborn](https://seaborn.pydata.org/)
+- [Scikit-learn](https://scikit-learn.org/stable/)
+- [Tensorflow](https://www.tensorflow.org/)
 
 On this main folder, we can find 5 directories, and 5 files.
 
