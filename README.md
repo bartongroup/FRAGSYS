@@ -1,5 +1,5 @@
 # FRAGSYS
-This repository contains the fragment screeening analysis pipeline (**FRAGSYS**) used for the analysis of our manuscript [_Classification of likely functional state for ligand binding sites identified from fragment screening_](https://doi.org/10.21203/rs.3.rs-3185838/v1) submitted to the journal [Nature Communications](https://www.nature.com/ncomms/).
+This repository contains the fragment screeening analysis pipeline (**FRAGSYS**) used for the analysis of our manuscript [_Classification of likely functional state for ligand binding sites identified from fragment screening_](https://doi.org/10.21203/rs.3.rs-3185838/v1).
 
 Our pipeline for the analysis of binding sites, **FRAGSYS**, can be executed from the jupyter notebook [`running_fragsys.ipynb`](running_fragsys.ipynb). The input for this pipeline is a list of protein [UniProt](https://www.uniprot.org/) accession identifiers.
 
