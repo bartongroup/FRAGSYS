@@ -1,12 +1,19 @@
 # FRAGSYS
 This repository contains the fragment screeening analysis pipeline (**FRAGSYS**) used for the analysis of our manuscript [_Classification of likely functional state for ligand binding sites identified from fragment screening_](https://doi.org/10.21203/rs.3.rs-3185838/v1) submitted to the journal [Nature Communications](https://www.nature.com/ncomms/).
 
-Third party dependencies for this pipeline include:
+FRAGSYS, i.e., our pipeline for the analysis of binding sites, can be executed from the jupyter notebook [`running_fragsys.ipynb`](running_fragsys.ipynb). The input for this pipeline is a list of protein [UniProt](https://www.uniprot.org/) accession identifiers.
+
+## Dependencies
+The pipeline, as well as the whole of the analysis are run in an interactive manner in a series of jupyter notebooks, found in the [`analysis`](analysis/) folder.
+
+Third party dependencies for these notebooks include:
 - [DSSP](https://swift.cmbi.umcn.nl/gv/dssp/)
 - [Hmmer](http://hmmer.org/)
-- [ProIntVar](https://github.com/bartongroup/prointvar)
-- [ProteoFAV](https://github.com/bartongroup/ProteoFAV)
-- [VarAlign](https://github.com/bartongroup/SM_varalign)
+- [ProIntVar](https://github.com/bartongroup/prointvar)*
+- [ProteoFAV](https://github.com/bartongroup/ProteoFAV)*
+- [VarAlign](https://github.com/bartongroup/SM_varalign)*
+
+* This is an in-house python library that will be publicly available soon.
 
 Other standard python libraries:
 - [Biopython](https://biopython.org/)
@@ -19,10 +26,9 @@ Other standard python libraries:
 - [Scikit-learn](https://scikit-learn.org/stable/)
 - [Tensorflow](https://www.tensorflow.org/)
 
+For more information, refere to the .yaml files in the [`envs`](envs/) directory.
+
 On this main folder, we can find 5 directories, and 5 files.
-
-FRAGSYS, i.e., our pipeline for the analysis of binding sites, can be executed from the jupyter notebook [`running_fragsys.ipynb`](running_fragsys.ipynb). The input for this pipeline is a list of protein [UniProt](https://www.uniprot.org/) accession identifiers.
-
 
 ## Files
 There are 5 different files on this repository main directory. Three of these are python libraries, then a notebook, and a configuration file.
