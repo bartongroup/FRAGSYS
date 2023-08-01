@@ -36,7 +36,7 @@ Third party dependencies for these notebooks include:
 - [STAMP](http://www.compbio.dundee.ac.uk/downloads/stamp/) [(GNU GPL v3.0 License)](http://www.compbio.dundee.ac.uk/manuals/stamp.4.4/stamp.html)
 - [ProIntVar](https://github.com/bartongroup/prointvar)<sup>*</sup> [(MIT License)](https://github.com/bartongroup/ProIntVar/blob/master/LICENSE.md)
 - [ProteoFAV](https://github.com/bartongroup/ProteoFAV)<sup>*</sup> [(MIT License)](https://github.com/bartongroup/ProteoFAV/blob/master/LICENSE.md)
-- [VarAlign](https://github.com/bartongroup/SM_varalign)<sup>*</sup>
+- [VarAlign](https://github.com/bartongroup/SM_varalign)<sup>*</sup> [(MIT License)](https://github.com/bartongroup/SM_VarAlign/blob/master/LICENSE)
 
 <sup>*</sup> This is an in-house python library that will be publicly available soon.
 
