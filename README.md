@@ -29,27 +29,27 @@ These tables are concatenated into master tables, with data for all 37 structual
 The pipeline, as well as the whole of the analysis are run in an interactive manner in a series of jupyter notebooks, found in the [`analysis`](analysis/) folder.
 
 Third party dependencies for these notebooks include:
-- [Arpeggio](https://github.com/harryjubb/arpeggio)
-- [DSSP](https://swift.cmbi.umcn.nl/gv/dssp/)
-- [Hmmer](http://hmmer.org/)
+- [Arpeggio](https://github.com/harryjubb/arpeggio) [(GNU GPL v3.0 License)](https://github.com/harryjubb/arpeggio/blob/master/LICENSE)
+- [DSSP](https://swift.cmbi.umcn.nl/gv/dssp/) [(Boost Software License)](https://swift.cmbi.umcn.nl/gv/dssp/)
+- [Hmmer](http://hmmer.org/) [(BSD-3 Clause License)](http://eddylab.org/software/hmmer/Userguide.pdf)
 - [OC](http://www.compbio.dundee.ac.uk/downloads/oc/)
-- [STAMP](http://www.compbio.dundee.ac.uk/downloads/stamp/)
-- [ProIntVar](https://github.com/bartongroup/prointvar)<sup>*</sup>
-- [ProteoFAV](https://github.com/bartongroup/ProteoFAV)<sup>*</sup>
+- [STAMP](http://www.compbio.dundee.ac.uk/downloads/stamp/) [(GNU GPL v3.0 License)](http://www.compbio.dundee.ac.uk/manuals/stamp.4.4/stamp.html)
+- [ProIntVar](https://github.com/bartongroup/prointvar)<sup>*</sup> [(MIT License)](https://github.com/bartongroup/ProIntVar/blob/master/LICENSE.md)
+- [ProteoFAV](https://github.com/bartongroup/ProteoFAV)<sup>*</sup> [(MIT License)](https://github.com/bartongroup/ProteoFAV/blob/master/LICENSE.md)
 - [VarAlign](https://github.com/bartongroup/SM_varalign)<sup>*</sup>
 
 <sup>*</sup> This is an in-house python library that will be publicly available soon.
 
 Other standard python libraries:
-- [Biopython](https://biopython.org/)
-- [Keras](https://keras.io/)
-- [Matplotlib](https://matplotlib.org/)
-- [Numpy](https://numpy.org/)
-- [Pandas](https://pandas.pydata.org/)
-- [Scipy](https://scipy.org/)
-- [Seaborn](https://seaborn.pydata.org/)
-- [Scikit-learn](https://scikit-learn.org/stable/)
-- [Tensorflow](https://www.tensorflow.org/)
+- [Biopython](https://biopython.org/) [(BSD 3-Clause License)](https://github.com/biopython/biopython/blob/master/LICENSE.rst)
+- [Keras](https://keras.io/) [(Apache v2.0 License)](https://github.com/keras-team/keras/blob/master/LICENSE)
+- [Matplotlib](https://matplotlib.org/) [(PSF License)](https://github.com/matplotlib/matplotlib/blob/main/LICENSE/LICENSE)
+- [Numpy](https://numpy.org/) [(BSD 3-Clause License)](https://github.com/numpy/numpy/blob/main/LICENSE.txt)
+- [Pandas](https://pandas.pydata.org/) [(BSD 3-Clause License)](https://github.com/pandas-dev/pandas/blob/main/LICENSE)
+- [Scipy](https://scipy.org/) [(BSD 3-Clause License)](https://github.com/scipy/scipy/blob/main/LICENSE.txt)
+- [Seaborn](https://seaborn.pydata.org/) [(BSD 3-Clause License)](https://github.com/mwaskom/seaborn/blob/master/LICENSE.md)
+- [Scikit-learn](https://scikit-learn.org/stable/) [(BSD 3-Clause License)](https://github.com/scikit-learn/scikit-learn/blob/main/COPYING)
+- [Tensorflow](https://www.tensorflow.org/) [(Apache v2.0 License)](https://github.com/tensorflow/tensorflow/blob/master/LICENSE)
 
 For more information, refere to the .yaml files in the [`envs`](envs/) directory.
 
