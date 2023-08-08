@@ -3,6 +3,8 @@ This repository contains the fragment screeening analysis pipeline (**FRAGSYS**)
 
 Our pipeline for the analysis of binding sites, **FRAGSYS**, can be executed from the jupyter notebook [`running_fragsys.ipynb`](running_fragsys.ipynb). The input for this pipeline is a list of protein [UniProt](https://www.uniprot.org/) accession identifiers.
 
+[![DOI](https://zenodo.org/badge/634598069.svg)](https://zenodo.org/badge/latestdoi/634598069)
+
 ## Pipeline methodology
 
 This is how to run **FRAGSYS**: `main(main_dir, prot, panddas)`
