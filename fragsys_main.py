@@ -4,6 +4,24 @@ from fragsys import *
 
 ### FRAGSYS ###
 
+import pickle
+
+def dump_pickle(data, f_out):
+    """
+    dumps pickle
+    """
+    with open(f_out, "wb") as f:
+        pickle.dump(data, f)
+
+def load_pickle(f_in):
+    """
+    loads pickle
+    """
+    with open(f_in, "rb") as f:
+        data = pickle.load(f)
+    return data
+
+
 def main(main_dir, prot, input_df):
     """
     This is the main fragsys function. It carries
@@ -87,6 +105,20 @@ def main(main_dir, prot, input_df):
                 id_equiv_dict = cif2pdb(cif_in, pdb_out) # only generated if files do not exist
                 cif2pdb_chain_dict[cif[:4]] = id_equiv_dict
                 bio2asym_chain_dict[cif[:4]] = get_chain_dict(cif_in)
+                
+        asym_dict_out = os.path.join(results_dir, "cif2pdb_dict_{}_{}.pkl".format(prot, str(subdir)))
+        cif2pdb_out = os.path.join(results_dir, "bio2asym_dict_{}_{}.pkl".format(prot, str(subdir)))
+                
+        if not os.path.isfile(asym_dict_out) and not os.path.isfile(cif2pdb_out):       
+            try:
+                dump_pickle(cif2pdb_chain_dict, asym_dict_out)
+                dump_pickle(bio2asym_chain_dict, cif2pdb_out)
+
+            except:
+                print("Sorry. could not save dicts. Continue!")
+        else:
+            cif2pdb_chain_dict = load_pickle(cif2pdb_out)
+            bio2asym_chain_dict = load_pickle(asym_dict_out)
 
         print("Starting STAMP section!")
         
@@ -237,8 +269,12 @@ def main(main_dir, prot, input_df):
                     print("No LOIs in {}, so skipping!".format(struc[:4]))
                     continue
                 else:
-                    lig_cons_split, arpeggio_lig_cons = process_arpeggio(struc, all_ligs, clean_pdbs_subdir, arpeggio_subdir, sifts_subdir, bio2asym_chain_dict[struc[:4]], cif2pdb_chain_dict[struc[:4]]) ### NOW PROCESSES ALL LIGANDS ###
-                    print("Arpeggio output being processed for {}!".format(struc[:4]))
+                    try:
+                        lig_cons_split, arpeggio_lig_cons = process_arpeggio(struc, all_ligs, clean_pdbs_subdir, arpeggio_subdir, sifts_subdir, bio2asym_chain_dict[struc[:4]], cif2pdb_chain_dict[struc[:4]]) ### NOW PROCESSES ALL LIGANDS ###
+                        print("Arpeggio output being processed for {}!".format(struc[:4]))
+                    except:
+                        print("Arpeggio processing failed for {}".format(struc))
+                        continue
             ligand_contact = arpeggio_lig_cons["PDB_ResNum"].astype(str)
             ligand_contact_list.append(ligand_contact)
     
@@ -275,46 +311,11 @@ def main(main_dir, prot, input_df):
         else:
             create_alignment_from_struc(example_struc, fasta_path)
             print("jackhmmer was generated correctly!")
-
-        aln_obj = Bio.AlignIO.read(hits_aln_rf, "stockholm") #crashes if target protein is not human!
-        aln_info_path = os.path.join(varalign_subdir, hits_aln_rf + "_info_table.p.gz")
-        if os.path.isfile(aln_info_path):
-            aln_info = pd.read_pickle(aln_info_path)
-        else:
-            aln_info = varalign.alignments.alignment_info_table(aln_obj)
-            aln_info.to_pickle(aln_info_path)
-            print("Aln info was correctly created and saved!")
-        aln_info_human = aln_info[aln_info.species == "HUMAN"]
-        
-        if len(aln_info_human) == 0: #THERE ARE NOT ANY HUMAN HOMOLOGUES FOR THE TARGET PROTEIN
-            print("There are {} sequences in the MSA for {} {}. Skipping to next protein sequence".format(len(aln_info_human), prot, subdir))
-            continue
             
-        human_hits_msa = os.path.join(hits_aln_rf[:-4] + "_human.sto")
-        if os.path.isfile(human_hits_msa):
-            pass
-        else:
-            get_human_subset_msa(hits_aln_rf, human_hits_msa)
-            print("Human subset MSA generated correctly!")
-
+        ### conservation calculation ###
+        
         prot_cols = get_target_prot_cols(hits_aln)
         
-        variant_table_path = os.path.join(varalign_subdir, human_hits_msa + "_human_variants.p.gz")
-        if os.path.isfile(variant_table_path):
-            variants_table = pd.read_pickle(variant_table_path)
-        else:
-            variants_table = varalign.align_variants.align_variants(aln_info_human, path_to_vcf = gnomad_vcf, include_other_info = False)
-            variants_table.to_pickle(variant_table_path)
-            print("Variant table was created and saved correctly!")
-
-        indexed_mapping_path = os.path.join(varalign_subdir, hits_aln_rf + '_mappings.p.gz')
-        if os.path.isfile(indexed_mapping_path):
-            indexed_mapping_table = pd.read_pickle(indexed_mapping_path)
-        else:
-            indexed_mapping_table = varalign.align_variants._mapping_table(aln_info) # now contains all species
-            indexed_mapping_table.to_pickle(indexed_mapping_path) # important for merging later on
-            print("Mapping table was created and saved correctly!")
-
         if os.path.isfile(shenkin_out):
             shenkin = pd.read_csv(shenkin_out)
         else:
@@ -326,38 +327,89 @@ def main(main_dir, prot, input_df):
         else:
             shenkin_filt = get_and_format_shenkin(shenkin, prot_cols, shenkin_filt_out)
             print("Shenkin dataframe was filtered and saved correctly!")
-
-        human_miss_vars = format_variant_table(variants_table, prot_cols) # GET ONLY MISSENSE VARIANTS ROWS
-
-        human_miss_vars_msa_out = os.path.join(varalign_subdir, hits_aln_rf[:-4] + "_human_missense_variants_seqs.sto")
-
-        miss_df_out = os.path.join(varalign_subdir, "{}_{}_missense_df.csv".format(prot, subdir))
-        if os.path.isfile(miss_df_out):
-            missense_variants_df = pd.read_csv(miss_df_out)
-
+            
+        aln_obj = Bio.AlignIO.read(hits_aln_rf, "stockholm") #crashes if target protein is not human!
+        aln_info_path = os.path.join(varalign_subdir, hits_aln_rf + "_info_table.p.gz")
+        if os.path.isfile(aln_info_path):
+            aln_info = pd.read_pickle(aln_info_path)
         else:
-            missense_variants_df = get_missense_df(
-                hits_aln_rf, aln_fmt, human_miss_vars,
-                shenkin_filt, prot_cols, human_miss_vars_msa_out
-            )
-            missense_variants_df = add_miss_class(
-                missense_variants_df, miss_df_out,
-                cons_col = "rel_norm_shenkin", thresholds = [25, 75]
-            )
-            print("Missense dataframe was created and saved correctly!")
+            aln_info = varalign.alignments.alignment_info_table(aln_obj)
+            aln_info.to_pickle(aln_info_path)
+            print("Aln info was correctly created and saved!")
+            
+        print("There are {} sequences in MSA".format(len(aln_info)))
+            
+        indexed_mapping_path = os.path.join(varalign_subdir, hits_aln_rf + '_mappings.p.gz')
+        if os.path.isfile(indexed_mapping_path):
+            indexed_mapping_table = pd.read_pickle(indexed_mapping_path)
+        else:
+            indexed_mapping_table = varalign.align_variants._mapping_table(aln_info) # now contains all species
+            indexed_mapping_table.to_pickle(indexed_mapping_path) # important for merging later on
+            print("Mapping table was created and saved correctly!")
         
-        shenkin_filt["human_shenkin"] = missense_variants_df.shenkin
-        shenkin_filt["human_occ"] = missense_variants_df.occ
-        shenkin_filt["human_gaps"] = missense_variants_df.gaps
-        shenkin_filt["human_occ_pct"] = missense_variants_df.occ_pct
-        shenkin_filt["human_gaps_pct"] = missense_variants_df.gaps_pct
-        shenkin_filt["variants"] = missense_variants_df.variants
-        shenkin_filt["oddsratio"] = missense_variants_df.oddsratio
-        shenkin_filt["log_oddsratio"] = missense_variants_df.log_oddsratio
-        shenkin_filt["pvalue"] = missense_variants_df.pvalue
-        shenkin_filt["ci_dist"] = missense_variants_df.ci_dist
+        ### variation pipeline
+            
+        aln_info_human = aln_info[aln_info.species == "HUMAN"]
         
-        aln_ids = list(set([seqid[0] for seqid in indexed_mapping_table.index.tolist() if prot in seqid[0]])) # THIS IS EMPTY IF QUERY SEQUENCE IS NOT FOUND
+        if len(aln_info_human) > 0:
+            print("There are {} HUMAN sequences in the MSA".format(len(aln_info_human)))
+        
+        #if len(aln_info_human) == 0: #THERE ARE NOT ANY HUMAN HOMOLOGUES FOR THE TARGET PROTEIN
+        #    print("There are {} sequences in the MSA for {} {}. Skipping to next protein sequence".format(len(aln_info_human), prot, subdir))
+        #    continue
+            
+            human_hits_msa = os.path.join(hits_aln_rf[:-4] + "_human.sto")
+            if os.path.isfile(human_hits_msa):
+                pass
+            else:
+                get_human_subset_msa(hits_aln_rf, human_hits_msa)
+                print("Human subset MSA generated correctly!")        
+        
+            variant_table_path = os.path.join(varalign_subdir, human_hits_msa + "_human_variants.p.gz")
+            if os.path.isfile(variant_table_path):
+                variants_table = pd.read_pickle(variant_table_path)
+            else:
+                variants_table = varalign.align_variants.align_variants(aln_info_human, path_to_vcf = gnomad_vcf, include_other_info = False)
+                variants_table.to_pickle(variant_table_path)
+                print("Variant table was created and saved correctly!")
+
+            human_miss_vars = format_variant_table(variants_table, prot_cols) # GET ONLY MISSENSE VARIANTS ROWS
+
+            human_miss_vars_msa_out = os.path.join(varalign_subdir, hits_aln_rf[:-4] + "_human_missense_variants_seqs.sto")
+
+            miss_df_out = os.path.join(varalign_subdir, "{}_{}_missense_df.csv".format(prot, subdir))
+            if os.path.isfile(miss_df_out):
+                missense_variants_df = pd.read_csv(miss_df_out)
+
+            else:
+                missense_variants_df = get_missense_df(
+                    hits_aln_rf, aln_fmt, human_miss_vars,
+                    shenkin_filt, prot_cols, human_miss_vars_msa_out
+                )
+                missense_variants_df = add_miss_class(
+                    missense_variants_df, miss_df_out,
+                    cons_col = "rel_norm_shenkin", thresholds = [25, 75]
+                )
+                print("Missense dataframe was created and saved correctly!")
+        
+            shenkin_filt["human_shenkin"] = missense_variants_df.shenkin
+            shenkin_filt["human_occ"] = missense_variants_df.occ
+            shenkin_filt["human_gaps"] = missense_variants_df.gaps
+            shenkin_filt["human_occ_pct"] = missense_variants_df.occ_pct
+            shenkin_filt["human_gaps_pct"] = missense_variants_df.gaps_pct
+            shenkin_filt["variants"] = missense_variants_df.variants
+            shenkin_filt["oddsratio"] = missense_variants_df.oddsratio
+            shenkin_filt["log_oddsratio"] = missense_variants_df.log_oddsratio
+            shenkin_filt["pvalue"] = missense_variants_df.pvalue
+            shenkin_filt["ci_dist"] = missense_variants_df.ci_dist
+        
+        else:
+            print("No human sequences in MSA")
+            pass
+        
+        aln_ids = list(set([seqid[0] for seqid in indexed_mapping_table.index.tolist() if "P0DTD1" in seqid[0]])) # THIS IS EMPTY IF QUERY SEQUENCE IS NOT FOUND
+        
+        print(aln_ids)
 
         mapped_data = merge_shenkin_df_and_mapping(shenkin_filt, indexed_mapping_table, aln_ids) #does it need to be only human?
         
@@ -386,7 +438,7 @@ def main(main_dir, prot, input_df):
             fragsys_df = add_bs_info2df(bs_sig_cols, all_contact_variations, fragsys_df_path)
             print("Fragsys results dataframe was created and saved successfully!")
     
-        totals = get_totals(mapped_data, prot, sifts_subdir)
+        #totals = get_totals(mapped_data, prot, sifts_subdir)
 
         ### BINDING SITE PLOTTING SECION ###
     

@@ -28,6 +28,11 @@ from tensorflow.keras.models import Sequential
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import ConfusionMatrixDisplay
 
+from scipy.special import comb
+from scipy.stats import norm
+
+from statsmodels.stats.proportion import proportion_confint
+
 ### PLOTTING ARGUMENTS
 
 alpha = 0.75

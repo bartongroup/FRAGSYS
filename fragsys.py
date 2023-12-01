@@ -104,6 +104,21 @@ mes_sig_t = float(config["other"].get("mes_sig_t"))
 
 ### PRE-PROCESSING DATA CODE ###
 
+def dump_pickle(data, f_out):
+    """
+    dumps pickle
+    """
+    with open(f_out, "wb") as f:
+        pickle.dump(data, f)
+
+def load_pickle(f_in):
+    """
+    loads pickle
+    """
+    with open(f_in, "rb") as f:
+        data = pickle.load(f)
+    return data
+
 def setup_fragsys_start(main_dir, prot, df):
     """
     given a main directory, protein accession and structures dataframe,
@@ -145,7 +160,10 @@ def setup_fragsys_start(main_dir, prot, df):
         if os.path.isfile(input_struc) or os.path.isfile(input_struc_moved):
             pass
         else:
-            download_structure_from_pdbe(struc, bio = True) # downloads only files missing
+            try:
+                download_structure_from_pdbe(struc, bio = True) # downloads only files missing
+            except:
+                print("Error with {}".format(struc))
         struc_files.append(input_struc)
         
     for file in struc_files:
