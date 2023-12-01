@@ -1,15 +1,17 @@
 # FRAGSYS
 This repository contains the fragment screeening analysis pipeline (**FRAGSYS**) used for the analysis of our manuscript [_Classification of likely functional state for ligand binding sites identified from fragment screening_](https://doi.org/10.21203/rs.3.rs-3185838/v1).
 
-Our pipeline for the analysis of binding sites, **FRAGSYS**, can be executed from the jupyter notebook [`running_fragsys.ipynb`](running_fragsys.ipynb). The input for this pipeline is a list of protein [UniProt](https://www.uniprot.org/) accession identifiers.
+Our pipeline for the analysis of binding sites, **FRAGSYS**, can be executed from the jupyter notebook [`running_fragsys.ipynb`](running_fragsys.ipynb). The input for this pipeline is a table containing a series of [PDB](https://www.ebi.ac.uk/pdbe/) codes and their respective [UniProt](https://www.uniprot.org/) accession identifiers.
 
 [![DOI](https://zenodo.org/badge/634598069.svg)](https://zenodo.org/badge/latestdoi/634598069)
 
 ## Pipeline methodology
 
-This is how to run **FRAGSYS**: `main(main_dir, prot, panddas)`
+Refer to  run jupyter notebook [`running_fragsys.ipynb`](running_fragsys.ipynb) in order to run **FRAGSYS**. You can do so interactively in a notebook by running this command: `main(main_dir, prot, panddas)` using the appropriate environment: [varalign_env](envs/varalign_env.yml).
 
 Where `main_dir` is the directory where the output will be saved, `prot` is the query protein, and `panddas` is a pandas dataframe that has to contain at least two columns: `entry_uniprot_accession`, and `pdb_id`, for all protein structures in the data set.
+
+For another example, check this other [`notebook`](https://github.com/bartongroup/FRAGSYS/blob/main/running_fragsys_for_MPRO.ipynb) where we ran **FRAGSYS** for the main protease (MPro) of SARS-CoV-2 (P0DTD1).
 
 For each structural segment of each protein in `panddas`, **FRAGSYS** will:
 1. Download biological assemblies from [PDBe](https://www.ebi.ac.uk/pdbe/)
