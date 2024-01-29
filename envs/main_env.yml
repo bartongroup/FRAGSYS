@@ -49,6 +49,7 @@ dependencies:
   - google-resumable-media=2.4.1=pyhd8ed1ab_0
   - googleapis-common-protos=1.57.1=pyhd8ed1ab_0
   - grpcio=1.51.1=py311hf734370_0
+  - hmmer=3.3.2=hdbdd923_4
   - icu=70.1=h27087fc_0
   - idna=3.4=pyhd8ed1ab_0
   - importlib-metadata=6.0.0=pyha770c72_0
