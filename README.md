@@ -11,6 +11,14 @@ Our pipeline for the analysis of binding sites, **FRAGSYS**, can be executed fro
 
 OC requires no installation, as the OC binary can be found on this repository, it is the filled called `oc`. Otherwise, the OC manual can be found [here](https://www.compbio.dundee.ac.uk/manuals/oc/oc_manual.txt), and OC can be downloaded [here](https://www.compbio.dundee.ac.uk/downloads/oc/).
 
+### Installation of DSSP
+
+DSSP is incompatible with all other environments, and so must go on its environment of its own. You can install locally as well, all we will need is the location of the executable. The version of the libboost library must be specified to be this one, otherwise, dssp will not run.
+
+```
+conda create -n dssp_env salilab::dssp=3.0.0 libboost=1.73.0
+```
+
 ### Installation of STAMP
 The following instructions are to install STAMP. For more information refer to the [STAMP installation instructions](https://www.compbio.dundee.ac.uk/downloads/stamp/INSTALL).
 
