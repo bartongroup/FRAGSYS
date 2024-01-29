@@ -1,4 +1,4 @@
-name: varalign-env-py3
+name: varalign_env
 channels:
   - salilab
   - conda-forge

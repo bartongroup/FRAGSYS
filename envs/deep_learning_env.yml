@@ -1,4 +1,4 @@
-name: deep_learning
+name: deep_learning_env
 channels:
   - salilab
   - conda-forge

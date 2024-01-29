@@ -1,4 +1,4 @@
-name: myenv2
+name: main_env
 channels:
   - salilab
   - conda-forge

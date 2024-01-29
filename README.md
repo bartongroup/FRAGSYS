@@ -5,6 +5,25 @@ Our pipeline for the analysis of binding sites, **FRAGSYS**, can be executed fro
 
 [![DOI](https://zenodo.org/badge/634598069.svg)](https://zenodo.org/badge/latestdoi/634598069)
 
+## Installation
+
+`# git clone FRAGSYS from repository
+git clone https://github.com/bartongroup/FRAGSYS.git`
+
+``# change directory to environments directory
+cd FRAGSYS/envs`
+
+# install enviornments
+
+# install myenv2 environment
+conda env create -f main_env.yml 
+
+# install deep_learning environment
+conda env create -f deep_learning_env.yml 
+
+# install varalign environment
+conda env create -f varalign_env.yml
+
 ## Pipeline methodology
 
 Refer to  run jupyter notebook [`running_fragsys.ipynb`](running_fragsys.ipynb) in order to run **FRAGSYS**. You can do so interactively in a notebook by running this command: `main(main_dir, prot, panddas)` using the appropriate environment: [varalign_env](envs/varalign_env.yml).
