@@ -7,6 +7,41 @@ Our pipeline for the analysis of binding sites, **FRAGSYS**, can be executed fro
 
 ## Installation
 
+### Installation of OC
+
+OC requires no installation, as the OC binary can be found on this repository, it is the filled called `oc`. Otherwise, the OC manual can be found [here](https://www.compbio.dundee.ac.uk/manuals/oc/oc_manual.txt), and OC can be downloaded [here](https://www.compbio.dundee.ac.uk/downloads/oc/).
+
+### Installation of STAMP
+The following instructions are to install STAMP. For more information refer to the [STAMP installation instructions](https://www.compbio.dundee.ac.uk/downloads/stamp/INSTALL).
+
+```
+# installing STAMP
+
+## download STAMP
+curl -O https://www.compbio.dundee.ac.uk/downloads/stamp/stamp.4.4.2.tar.gz
+
+## decompress STAMP
+tar -xzvf stamp.4.4.2.tar.gz
+```
+To install STAMP, run the BUILD script in this directory using:
+```
+## building STAMP
+./BUILD <system-type>
+```
+where \<system-type\> is one of:
+
+- linux
+- osx 
+- dec
+- sgi
+- sun
+
+The executables will be installed in bin/\<system-type\>/.
+
+For more information refer to the [STAMP manual](https://www.compbio.dundee.ac.uk/manuals/stamp.4.4/stamp.html)
+
+### Installation of FRAGSYS
+
 The first step to install **FRAGSYS** is to Git Clone the repository.
 
 ```
@@ -17,19 +52,89 @@ git clone https://github.com/bartongroup/FRAGSYS.git
 The next step is to install the three Conda environments needed to run the pipeline and analyse the results. This can be done with Conda using the .yml files in the [`envs`](envs/) directory.
 
 ```
-# change directory to environments directory
+## change directory to environments directory
 cd FRAGSYS/envs
 
-# install enviornments
+## install environments
 
-# install main environment
+### install main_env environment
 conda env create -f main_env.yml 
 
-# install deep_learning environment
-conda env create -f deep_learning_env.yml 
+### install deep_learning environment
+conda env create -f deep_learning_env.yml
 
-# install varalign environment
+### install arpeggio environment
+conda env create -f arpeggio_env.yml
+
+#### activating arpeggio environment
+conda activate arpeggio_env
+
+#### change directory to main working directory
+cd ../..
+
+#### git clone Arpeggio from repository
+git clone https://bitbucket.org/biomadeira/arpeggio
+
+#### change directory to Arpeggio directory
+cd arpeggio
+
+#### test arpeggio with help function
+python arpeggio.py -h
+```
+
+### Installation of VarAlign
+
+The following instructions are to install VarAlign. Fore more information refer to the [VarAlign repository](https://github.com/bartongroup/SM_VarAlign/tree/JSU_branch).
+
+```
+#### change directory to FRAGSYS envs directory
+cd ../FRAGSYS/envs/
+
+### install varalign environment
 conda env create -f varalign_env.yml
+
+# VarAlign installation (Grabbed from URL)
+
+#### change directory to main working directory
+cd ../..
+
+## git clone specific branch of VarAlign from repository
+git clone -b JSU_branch https://github.com/bartongroup/SM_VarAlign.git
+
+## change directory to VarAlign directory
+cd SM_VarAlign
+
+## activate varalign_env environment
+conda activate varalign_env
+
+## install VarAlign
+pip install .
+```
+
+### Installation of ProIntVar
+
+The following instructions are to install ProIntVar. Fore more information refer to the [ProIntVar repository](https://github.com/bartongroup/ProIntVar/tree/JSU_branch).
+
+```
+## ProIntVar installation (Grabbed from URL)
+
+### change directory to main working directory
+cd ..
+
+### git clone specific branch of ProIntVar from repository
+git clone -b JSU_branch https://github.com/bartongroup/ProIntVar.git
+
+### change directory to ProIntVar directory
+cd ProIntVar
+
+### pip install ProIntVar dependencies
+pip install -r requirements.txt
+
+#then
+python setup.py install
+
+### set up ProIntVar configuration
+ProIntVar-config-setup new_config.ini
 ```
 
 ## Pipeline methodology
