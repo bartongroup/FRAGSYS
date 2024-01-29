@@ -1,0 +1,421 @@
+
+OC - A Cluster Analysis Program 
+-------------------------------
+
+Usage notes - 2/April/1997
+--------------------------
+
+Release 2.0 - 4 August 2002
+--------------------------
+
+Release 2.1 (Version 1.3) - 2 February 2004
+-----------------------------
+
+Author: Geoffrey  J. Barton
+
+email:  geoff@compbio.dundee.ac.uk
+
+
+Notes
+-----
+
+If you use OC in your work, please remember to cite it.  
+
+If you modify it please send me a copy of your changes.  I will try to
+incorporate them into a common source.  However, if you plan any major
+changes, please contact me first.  It may be that I have already done
+what you need.
+
+
+Release notes
+-------------
+
+Release 2.1 (Version 1.3): The postscript output options in OC were
+never intended to be very pretty, but we needed to be able to print
+out large trees in postscript and so some small changes were made to
+help with this.  Firstly, ps output is now encapsulated postscript
+(eps) rather than simple ps.  Secondly, the minside and maxside
+command line options have been documented.  All postscript output is
+PORTRAIT and minside is the narrow side of the page and maxside the
+long side (in inches).  For example, define the (minside 11 maxside
+52), run OC then run the utility epssplit from
+http://home.clara.net/nox/software/epssplit.
+
+Release 2.0 (Version 1.0): The main oc program is unchanged, but two
+new callable versions are in the distributions that start with 'noc'.
+Functions gjnoc.c and gjnoc2.c are callable from C and return data
+structures with the information on the clusters formed.  Of the two,
+gjnoc2 is probably most useful.  gjnoc was written to feed other
+programs we distribute (notably STAMP).
+
+Introduction
+------------
+
+OC is a general purpose hierarchical cluster analysis program.  It was
+written to have NO software defined limits.  The maximum number of
+entities that you can cluster with OC is only limited by available
+memory (and time!!).  OC was written in 1993 to cluster large families
+of protein sequences.  Though developed for this purpose, there is
+nothing specific to proteins in its implementation, so it can be used
+to cluster any sort of data.
+
+It has been used extensively in my group most notably in the 3Dee
+domains database (http://www.compbio.dundee.ac.uk) and also in the STAMP
+structure comparison package.  Over the years I have given the program
+to a few people but never got around to writing up any instructions or
+packaging it as a proper distribution.  These notes will hopefully
+make the program a little easier for others to use and understand.
+
+OC requires a complete upper diagonal distance or similarity matrix as
+input and implements three simple clustering methods:
+
+1. single linkage.
+2. complete linkage.
+3. means linkage - UPGMA.
+
+These are explained further below.
+
+Output is a list of the clusters as they form and optionally a
+dendrogram drawn in PostScript.  The dendrogram drawing functions are
+fairly primitive.  The program will also, optionally, output all
+clusters above some threshold.  See further details below.
+
+Input file
+----------
+
+First line: An integer showing the number (N) of entities you are
+clustering.  Lines 2 to N+1: Labels for the entities.  These should be
+strings, without spaces.  Following N*(N-1)/2 lines: The upper
+diagonal matrix (free format).
+
+For example, see file test.dis.
+
+7
+First
+Second
+Third
+Fourth
+Fifth
+Sixth
+Seventh
+100.0 
+100.0  
+50.0  
+33.0  
+25.0  
+20.0
+100.0  
+50.0  
+50.0  
+33.0  
+33.0
+100.0  
+33.0  
+20.0  
+25.0
+33.0  
+20.0  
+25.0
+100.0 
+100.0
+100.0
+
+By upper diagonal, I mean that the numbers are the similarities (or distances)
+from comparison of entity 1 v 2, 1 v 3, 1 v 4, 1 v 5, 1 v 6, 1 v 7, 
+                                 2 v 3, 2 v 4, 2 v 5, 2 v 6, 2 v 7,
+                                        3 v 4, 3 v 5, 3 v 6, 3 v 7,
+                                               4 v 5, 4 v 6, 4 v 7,
+                                                      5 v 6, 5 v 7,
+                                                             6 v 7.
+In that order.
+
+Running the program
+-------------------
+
+The program expects the data file to be on standard input, thus you type:
+
+oc  [arguments]  < test.dis > results.ocout
+
+The first argument is one of 'sim' or 'dis' and defines whether the
+data are similarities, i.e. bigger numbers mean that the entities are
+more like each other, or distances, i.e. smaller numbers mean the
+entities are more like each other.
+
+The second argument defines the clustering type, in explaining this I
+will assume that we are clustering on distances, not similarities.
+
+Hierarchical clustering works by first finding the two entites that
+have the minimum distance between them.  Having joined those two
+entities into a cluster, the method then searches for the minimum
+distance between two entites, but taking those entities that are
+already clustered as a single unit. This process is repeated until
+there are no more entities to cluster.  What differs in the different
+clustering methods is how the 'distance' is calculated between two
+clusters that have already formed.
+
+In 'single' linkage, the MINIMUM distance between the two clusters is
+taken as the distance.  This is the simplest cluster analysis method.
+It has the disadvantage that an outlier can cause two groups of
+entities to be clustered when most of the entities are really quite
+distant.  Single linkage tends to form a few big clusters early on in
+the hierarchy.
+
+In 'complete' linkage, the MAXIMUM distance between the clusters is
+taken.  This has the advantage over single linkage in that  within a
+cluster, all pairs of entities will be within the distance at which
+the cluster was formed.  Complete linkage tends to form many smaller
+clusters.  The dendrograms have more structure to them and are often
+more informative than single linkage dendrograms.
+
+In 'means' linkage as the name suggests, the mean distance between
+clusters is calculated.  This can be a good compromise between the
+extremes of single and complete linkage, but the distances at which
+clusters are formed are averages, not real distances.  As a
+consequence, the clusters can be more difficult to interpret.
+
+There are many other clustering methods and most should be simple to
+add as options to oc.
+
+
+Examples
+--------
+
+<orac:78>oc dis complete < test.dis
+Reading Upper Diagonal
+Read: 7 Entries
+CPU time: 0.000000 seconds
+Setting up unclust
+Setting up notparent
+Setting up clust
+CPU time: 0.000000 seconds
+Complete linkage on distance
+Doing Cluster Analysis...
+## 0 20 2
+Entity Score: 20  Number of members: 2
+ 0 6
+## 1 20 2
+Entity Score: 20  Number of members: 2
+ 2 5
+## 2 33 2
+Entity Score: 33  Number of members: 2
+ 3 4
+## 3 50 3
+Entity Score: 50  Number of members: 3
+ 1 3 4
+## 4 100 5
+Entity Score: 100  Number of members: 5
+ 2 5 1 3 4
+## 5 100 7
+Entity Score: 100  Number of members: 7
+ 0 6 2 5 1 3 4
+Total CPU time: 0.010000 seconds
+
+
+Complete linkage on the test.dis file.  There are 7 entities in the
+file.  They are numbered by the program 0 to 6.  As each cluster is
+formed, the program writes a double hash (##), then the cluster
+number, the score at which the cluster is formed and the number of
+entites in the cluster.  This is followed by a line, repeating the
+entity score and number of members in the cluster.  Finally, a line is
+written with the numbers of the entities in the cluster.
+
+
+For example:
+
+## 3 50 3
+Entity Score: 50  Number of members: 3
+ 1 3 4
+
+means cluster number 3 was formed at a score (distance) of 50 and has
+three members, the entities 1,3 and 4.
+
+
+Since entity numbers are simply the order in which the data was read
+in from the file, it is usually better to refer to the entities by
+their labels.  To do this, just add the 'id' option to the command
+line.
+
+
+<orac:79>oc dis complete id < test.dis
+Reading Upper Diagonal
+Read: 7 Entries
+CPU time: 0.000000 seconds
+Setting up unclust
+Setting up notparent
+Setting up clust
+CPU time: 0.000000 seconds
+Complete linkage on distance
+Doing Cluster Analysis...
+## 0 20 2
+ First Seventh
+## 1 20 2
+ Third Sixth
+## 2 33 2
+ Fourth Fifth
+## 3 50 3
+ Second Fourth Fifth
+## 4 100 5
+ Third Sixth Second Fourth Fifth
+## 5 100 7
+ First Seventh Third Sixth Second Fourth Fifth
+Total CPU time: 0.000000 seconds
+
+The output is similar to above, but the entities are labelled rather
+than numbered.
+
+You can obtain an encapsulated PostScript dendrogram of the clustering by adding the
+argument ps <filename>.  For example:
+
+
+<orac:81>oc dis complete id ps test < test.dis
+Reading Upper Diagonal
+Read: 7 Entries
+CPU time: 0.000000 seconds
+Setting up unclust
+Setting up notparent
+Setting up clust
+CPU time: 0.000000 seconds
+Complete linkage on distance
+Doing Cluster Analysis...
+## 0 20 2
+ First Seventh
+## 1 20 2
+ Third Sixth
+## 2 33 2
+ Fourth Fifth
+## 3 50 3
+ Second Fourth Fifth
+## 4 100 5
+ Third Sixth Second Fourth Fifth
+## 5 100 7
+ First Seventh Third Sixth Second Fourth Fifth
+Total CPU time: 0.010000 seconds
+
+This will create a file called test.eps which can be printed on a
+PostScript printer, or viewed with GhostView or some other PostScript
+viewer.  The dendrogram is scaled to fit on a single A4 page which is
+a little inconvenient if you have thousands of entities.  You can
+specify different dimensions for the plot by providing the "minside"
+and "maxside" commands to OC.  For example, to make a plot that is 11
+inches wide (the long side of A4) by 40 inches high do:
+
+oc dis complete id ps test minside 11 maxside 40 < test.dis
+
+The test.eps file that results will need some further processing with
+a utility to tile the postscript over multiple pages.  You could do
+this in Adobe Illustrator (but my experience is that this is a touch
+slow) it is better to use the "epssplit" utility from:
+
+http://home.clara.net/nox/software/epssplit.  See the instructions
+there on how to use the epssplit program for this.
+
+Adding the 'cut' option allows OC to output only clusters that form 
+above that threshold.
+
+For example, 
+
+<orac:84>oc dis complete id cut 20 < test.dis
+Reading Upper Diagonal
+Read: 7 Entries
+CPU time: 0.000000 seconds
+Setting up unclust
+Setting up notparent
+Setting up clust
+CPU time: 0.000000 seconds
+Complete linkage on distance
+Doing Cluster Analysis...
+## 1 20 2
+ Third Sixth
+## 0 20 2
+ First Seventh
+
+UNCLUSTERED ENTITIES
+Second
+Fourth
+Fifth
+Total CPU time: 0.000000 seconds
+
+
+... only outputs clusters that are formed above the threshold of 20 in
+this case.  Entities that are not clustered with any other entity are
+listed as UNCLUSTERED ENTITIES.  Note: You could get the same
+information from the standard OC output file with a little post
+processing.
+
+Note:  if you use the gjnoc2 function, then the unclustered entities are added
+to the returned structure as if they were clusters of size 1.  The score for
+forming these clusters is reported as the 'cut' score.
+
+
+Other options:
+--------------
+
+'log'  		Takes logs before clustering.  This is not recommended - 
+		I've not put any traps in for illegal numbersa. 
+'timeclus'	Outputs the time to form each cluster.
+'amps' 		Outputs .tree and .tord files for use
+		with the AMPS multiple alignment package.  oc simply replaces the 
+		more limited program ORDER.
+'minside <dim>' Specify the length of the short (horizontal) side for the 
+                postscript plot (in inches).
+'maxside <dim>' Specify the length of the long (vertical) side for the 
+                postscript plot (in inches).
+
+
+
+Installation Notes
+------------------
+
+OC is written in ANSI C and has four source code files.
+
+oc.c		The oc program.
+oc.h		The oc header file.
+gjutil.c	Utility routines.
+gjutil.h	Header for the utility routines.
+
+To compile under Unix do:
+
+cc -c oc oc.c gjutil.c -I./ -lm
+
+Under other operating systems you need to ensure that the compiler
+searches the current directory for header files and that you link the
+maths library.
+
+Put the oc executable somewhere on your path.  Typing oc gets you:
+
+
+<orac:75>oc
+Cluster analysis program
+
+Author:  Geoffrey J. Barton
+Copyright:  Geoffrey J. Barton (1993, 1997)
+
+Please cite: OC a cluster analysis program, Barton, G. J.  1993
+
+Usage: oc <sim/dis> <single/complete/means> <ps> <cut N>
+
+Version 1.0 - Requires a file to be piped to standard input
+Format:  Line   1:  Number (N) of entities to cluster (e.g. 10)
+Format:  Lines 2 to 2+N-1:  Identifier codes for the entities (e.g. Entity1)
+Format:  N*(N-1)/2:  Distances, or similarities - ie the upper diagonal
+
+Options:
+sim = similarity /  dis = distances
+method = single/complete/means
+ps <file> = plot out dendrogram to <file.ps> 
+log = take logs before calculation 
+cut = only show clusters above/below the cutoff
+id = output identifier codes rather than indexes for entities
+timeclus = output times to generate each cluster
+amps <file> = produce amps <file>.tree and <file>.tord files
+
+See README file for brief instructions
+
+The gjnoc and gjnoc2 functions come with two test programs to check that all is 
+well.  There are also files that show the compile line needed to make these
+test programs.
+
+
+--------------------------------------------------------------------------------
+End of OC usage notes.
+
