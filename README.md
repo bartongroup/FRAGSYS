@@ -7,15 +7,22 @@ Our pipeline for the analysis of binding sites, **FRAGSYS**, can be executed fro
 
 ## Installation
 
-`# git clone FRAGSYS from repository
-git clone https://github.com/bartongroup/FRAGSYS.git`
+The first step to install **FRAGSYS** is to Git Clone the repository.
 
-``# change directory to environments directory
-cd FRAGSYS/envs`
+```
+# git clone FRAGSYS from repository
+git clone https://github.com/bartongroup/FRAGSYS.git
+```
+
+The next step is to install the three Conda environments needed to run the pipeline and analyse the results. This can be done with Conda using the .yml files in the [`envs`](envs/) directory.
+
+```
+# change directory to environments directory
+cd FRAGSYS/envs
 
 # install enviornments
 
-# install myenv2 environment
+# install main environment
 conda env create -f main_env.yml 
 
 # install deep_learning environment
@@ -23,6 +30,7 @@ conda env create -f deep_learning_env.yml
 
 # install varalign environment
 conda env create -f varalign_env.yml
+```
 
 ## Pipeline methodology
 
