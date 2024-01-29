@@ -139,8 +139,5 @@ dependencies:
     - click-log==0.3.2
     - lxml==4.4.1
     - matplotlib-venn==0.11.7
-    - prointvar==0.1.0
-    - proteofav==0.2.3
     - responses==0.10.6
-    - varalign==0.0.0
 prefix: /cluster/gjb_lab/2394007/miniconda/envs/varalign-env-py3
