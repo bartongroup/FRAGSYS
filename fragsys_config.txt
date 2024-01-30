@@ -21,6 +21,6 @@ mes_sig_t = 0.2
 [clustering]
 oc_dist = 0.66
 oc_metric = i_rel
-oc_method = complete
+oc_method = single
 
 ### END OF CONFIG FILE ###
