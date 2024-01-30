@@ -239,9 +239,11 @@ def cluster_protein_sequences(prot, main_dir, h = 0.2, show = False):
     else:
         pass
         
-    plot_clustermap(msa_df_norm, prot, wd, show)
+    condensed_matrix = scipy.spatial.distance.squareform(msa_df_norm)
     
-    z = scipy.cluster.hierarchy.linkage(scipy.spatial.distance.squareform(msa_df_norm), method = "complete")
+    z = scipy.cluster.hierarchy.linkage(condensed_matrix, method = "complete")
+        
+    plot_clustermap(msa_df_norm, z, prot, wd, show)
     
     plot_dendrogram(z, msa_df_norm, wd, prot, h, show)
     
@@ -269,13 +271,13 @@ def get_msa_matrix(seqs_list, norm = True):
     else:
         return scores
 
-def plot_clustermap(msa_df_norm, prot, wd, show = False):
+def plot_clustermap(msa_df_norm, linkage, prot, wd, show = False):
     """
     Plots a clustermap given a matrix of distances between sequences
     """
     plt.rcParams['figure.dpi'] = 300
     g = sns.clustermap(
-        msa_df_norm, #square = True,
+        msa_df_norm, row_linkage=linkage, col_linkage=linkage,
         cmap = "viridis_r", linewidths = 1, linecolor = "k",
         vmin = 0, vmax = 1
     )
