@@ -1,17 +1,17 @@
 ### FRAGSYS CONFIG FILE ###
 
 [binaries]
-oc_bin = ./bin/oc
 dssp_bin = /path/to/miniconda/envs/dssp_env/bin/mkdssp
+oc_bin = ./../oc-2.1a/oc
 stamp_bin = ./../stamp.4.4.2/bin/operative_system/stamp
 transform_bin = ./../stamp.4.4.2/bin/operative_system/transform
 clean_pdb_python_bin = /path/to/miniconda/envs/arpeggio_env/bin/python
 clean_pdb_bin = ./bin/clean_pdb.py
 arpeggio_python_bin = /path/to/miniconda/envs/arpeggio_env/bin/python
-arpeggio_bin = /path/2394007/SM_VarAlign/arpeggio/arpeggio.py
+arpeggio_bin = ./../arpeggio/arpeggio.py
 
 [dbs]
-gnomad_vcf = /homes/smacgowan/NOBACK/resources/gnomad/gnomad.exomes.r2.0.1.sites.vcf.gz
+gnomad_vcf = /path/to/your/gnomad/vcf
 swissprot = /path/to/your/sequence/database/in/fasta/format
 
 [other]
