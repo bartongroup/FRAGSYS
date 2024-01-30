@@ -64,6 +64,10 @@ def main(main_dir, prot, input_df):
     
     sp = get_swissprot()
 
+    cache_dir = os.path.join(os.getcwd(), ".varalign")
+    if not os.path.isdir(cache_dir):
+        os.mkdir(cache_dir)
+
     cfg.dssp_bin = dssp_bin
     aln_fmt = "stockholm"
     
