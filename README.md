@@ -140,9 +140,39 @@ pip install -r requirements.txt
 
 #then
 python setup.py install
+```
+
+### Configuration of ProIntVar
+
+```
+# change directory to VarAlign directory
+cd ../SM_VarAlign
 
 ### set up ProIntVar configuration
 ProIntVar-config-setup new_config.ini
+
+### edit the following values in new_config.ini
+#### arpeggio_bin = /path/to/arpeggio/arpeggio.py
+#### python_exe = /path/to/anaconda/envs/arpeggio/bin/python
+#### python_path = /path/to/anaconda/envs/arpeggio/python/lib/site-packages/
+#### dssp_bin = /path/to/anaconda/envs/bin/mkdssp
+```
+
+### Configuration of FRAGSYS
+
+Head to the [fragsys configuration file](fragsys_config.txt) and edit the following fields. Note: not all of them need changing, just showing the ones that do.
+```
+[binaries]
+dssp_bin = /path/to/miniconda/envs/dssp_env/bin/mkdssp
+stamp_bin = ./../stamp.4.4.2/bin/operative_system/stamp # change operative_system here
+transform_bin = ./../stamp.4.4.2/bin/operative_system/transform # change operative_system here
+clean_pdb_python_bin = /path/to/miniconda/envs/arpeggio_env/bin/python
+arpeggio_python_bin = /path/to/miniconda/envs/arpeggio_env/bin/python
+arpeggio_bin = /path/2394007/SM_VarAlign/arpeggio/arpeggio.py
+
+[dbs]
+gnomad_vcf = /homes/smacgowan/NOBACK/resources/gnomad/gnomad.exomes.r2.0.1.sites.vcf.gz # THIS NEEDS FIXING
+swissprot = /path/to/your/sequence/database/in/fasta/format
 ```
 
 ## Pipeline methodology
