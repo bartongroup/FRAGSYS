@@ -1,5 +1,7 @@
 ### FRAGSYS CONFIG FILE ###
+
 [binaries]
+oc_bin = ./bin/oc
 dssp_bin = /path/to/miniconda/envs/dssp_env/bin/mkdssp
 stamp_bin = ./../stamp.4.4.2/bin/operative_system/stamp
 transform_bin = ./../stamp.4.4.2/bin/operative_system/transform
@@ -7,7 +9,6 @@ clean_pdb_python_bin = /path/to/miniconda/envs/arpeggio_env/bin/python
 clean_pdb_bin = ./bin/clean_pdb.py
 arpeggio_python_bin = /path/to/miniconda/envs/arpeggio_env/bin/python
 arpeggio_bin = /path/2394007/SM_VarAlign/arpeggio/arpeggio.py
-oc_bin = ./bin/oc
 
 [dbs]
 gnomad_vcf = /homes/smacgowan/NOBACK/resources/gnomad/gnomad.exomes.r2.0.1.sites.vcf.gz
@@ -16,6 +17,7 @@ swissprot = /path/to/your/sequence/database/in/fasta/format
 [other]
 stampdir = ./../stamp.4.4.2/defs/
 mes_sig_t = 0.2
+
 [clustering]
 oc_dist = 0.66
 oc_metric = i_rel
