@@ -9,7 +9,27 @@ Our pipeline for the analysis of binding sites, **FRAGSYS**, can be executed fro
 
 ### Installation of OC
 
-OC requires no installation, as the OC binary can be found on this repository, it is the filled called `oc`. Otherwise, the OC manual can be found [here](https://www.compbio.dundee.ac.uk/manuals/oc/oc_manual.txt), and OC can be downloaded [here](https://www.compbio.dundee.ac.uk/downloads/oc/).
+The following instructions are to install OC. For more information refer to the OC manual [here](https://www.compbio.dundee.ac.uk/manuals/oc/oc_manual.txt), and OC can be downloaded [here](https://www.compbio.dundee.ac.uk/downloads/oc/).
+
+```
+# download OC
+wget https://www.compbio.dundee.ac.uk/downloads/oc/oc-2.1a.tar.gz
+
+# decompress OC
+tar -xzvf oc-2.1a.tar.gz 
+
+# change directory to OC main directory
+cd oc-2.1a
+
+# change getline function name
+sed -i '1282s/getline/readline/; 1290s/getline/readline/; 1338s/getline/readline/' oc.c
+
+# compile OC
+gcc -o oc -O3  oc.c gjutil.c gjtimes.c -I./gjutil -I./ -lm
+
+# check OC works
+./oc
+```
 
 ### Installation of DSSP
 
