@@ -158,6 +158,17 @@ ProIntVar-config-setup new_config.ini
 #### dssp_bin = /path/to/anaconda/envs/bin/mkdssp
 ```
 
+### Downloading SwissProt
+
+This is the database used for our analysis, but can be changed according to the user purposes, e.g. TrEMBL. What is important is to add the correct path in the [fragsys configuration file](fragsys_config.txt). To download SwissProt, follow the next steps.
+```
+# download SwissProt in fasta format
+wget https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz
+
+# decrompress the file
+gzip -d uniprot_sprot.fasta.gz
+```
+
 ### Configuration of FRAGSYS
 
 Head to the [fragsys configuration file](fragsys_config.txt) and edit the following fields. Note: not all of them need changing, just showing the ones that do.
@@ -172,7 +183,7 @@ arpeggio_bin = /path/2394007/SM_VarAlign/arpeggio/arpeggio.py
 
 [dbs]
 gnomad_vcf = /homes/smacgowan/NOBACK/resources/gnomad/gnomad.exomes.r2.0.1.sites.vcf.gz # THIS NEEDS FIXING
-swissprot = /path/to/your/sequence/database/in/fasta/format
+swissprot = ./../uniprot_sprot.fasta
 ```
 
 ## Pipeline methodology
