@@ -88,6 +88,7 @@ config = configparser.ConfigParser()
 config.read("fragsys_config.txt")
 
 dssp_bin = config["binaries"].get("dssp_bin")
+oc_bin = config["binaries"].get("oc_bin")
 stamp_bin = config["binaries"].get("stamp_bin")
 transform_bin = config["binaries"].get("transform_bin")
 clean_pdb_python_bin = config["binaries"].get("clean_pdb_python_bin")
@@ -135,7 +136,7 @@ def setup_fragsys_start(main_dir, prot, df):
         os.mkdir(unsupp_cifs_dir)
     else:
         pass
-    prot_df = df[df.entry_uniprot_accession == prot]
+    prot_df = df.query('entry_uniprot_accession == @prot').copy()
     prot_strucs = prot_df.pdb_id.unique().tolist()
     struc_files = []
     unsupp_cifs_subirs = os.listdir(unsupp_cifs_dir)
@@ -301,9 +302,9 @@ def plot_dendrogram(z, msa_df_norm, wd, prot, h, show = False):
     d = scipy.cluster.hierarchy.dendrogram(
         z, labels = msa_df_norm.index, color_threshold = h
     )
-    plt.title("Complete linkage clustering of unique sequences", fontsize = 15, pad = 15)
-    plt.xlabel("Unique sequence ID", fontsize = 10, labelpad = 10)
-    plt.ylabel("Alignment score distance", fontsize = 10, labelpad = 10)
+    plt.title("Complete linkage clustering of unique sequences", fontsize = 15)
+    plt.xlabel("Unique sequence ID", fontsize = 10)
+    plt.ylabel("Alignment score distance", fontsize = 10)
     plt.axhline(y = 0.2, linestyle = "--", color = "k", linewidth = 1)
     fig_out = os.path.join(wd, "{}_unique_seqs_dendrogram.png".format(prot))
     if os.path.isfile(fig_out):
@@ -390,8 +391,8 @@ def get_chain_dict(cif_path):
     Creates an equivalence dict between asymemtric unit chain IDs and biological assembly chain IDs
     """
     cif_df = PDBXreader(inputfile = cif_path).atoms(format_type = "mmcif", excluded=())
-    orig_chains = cif_df[cif_df.group_PDB == "ATOM"][['orig_auth_asym_id', 'auth_asym_id']].drop_duplicates().orig_auth_asym_id.tolist()
-    new_chains = cif_df[cif_df.group_PDB == "ATOM"][['orig_auth_asym_id', 'auth_asym_id']].drop_duplicates().auth_asym_id.tolist()
+    orig_chains = cif_df.query('group_PDB == "ATOM"').copy()[['orig_auth_asym_id', 'auth_asym_id']].drop_duplicates().orig_auth_asym_id.tolist()
+    new_chains = cif_df.query('group_PDB == "ATOM"').copy()[['orig_auth_asym_id', 'auth_asym_id']].drop_duplicates().auth_asym_id.tolist()
     chain_dict = {new_chains[i]: orig_chains[i] for i in range(len(orig_chains))}
     return chain_dict
 
@@ -476,12 +477,12 @@ def get_lig_data(supp_pdbs_dir, ligs_df_path):
     for struc in os.listdir(supp_pdbs_dir):
         struc_path = os.path.join(supp_pdbs_dir, struc)
         df = PDBXreader(inputfile = struc_path).atoms(format_type = "pdb", excluded=())
-        hetatm_df = df[df.group_PDB == "HETATM"]
+        hetatm_df = df.query('group_PDB == "HETATM"').copy()
         ligs = hetatm_df.label_comp_id.unique().tolist()
         lois = [lig for lig in ligs if lig not in non_relevant]
         for loi in lois:
-            loi_df = hetatm_df[hetatm_df.label_comp_id == loi]
-            lois_df_un = loi_df.drop_duplicates(["label_comp_id", "label_asym_id"])[["label_comp_id", "label_asym_id", "auth_seq_id"]]
+            loi_df = hetatm_df.query('label_comp_id == @loi').copy()
+            lois_df_un = loi_df.copy().drop_duplicates(["label_comp_id", "label_asym_id"])[["label_comp_id", "label_asym_id", "auth_seq_id"]]
             lois_df_un["struc_name"] = struc
             ligs_df = ligs_df.append(lois_df_un)
     ligs_df = ligs_df[["struc_name","label_comp_id", "label_asym_id", "auth_seq_id"]]
@@ -650,8 +651,8 @@ def process_arpeggio(struc, all_ligs, clean_pdbs_dir, arpeggio_dir, sifts_dir, b
 
     old_len1 = len(arpeggio_lig_cons)
     old_len2 = len(lig_cons_split)
-    lig_cons_split = lig_cons_split[~lig_cons_split.UniProt_Resnum.isnull()]
-    arpeggio_lig_cons = arpeggio_lig_cons[~arpeggio_lig_cons.UniProt_Resnum.isnull()]
+    lig_cons_split = lig_cons_split[~lig_cons_split.UniProt_Resnum.isnull()].copy()
+    arpeggio_lig_cons = arpeggio_lig_cons[~arpeggio_lig_cons.UniProt_Resnum.isnull()].copy()
     new_len1 = len(arpeggio_lig_cons)
     new_len2 = len(lig_cons_split)
     if new_len1 != old_len1:
@@ -675,7 +676,7 @@ def reformat_arpeggio(arpeggio_df):
         'Weak Hydrogen Bond', 'Halogen bond',  'Ionic', 'Metal Complex', 'Aromatic', 'Hydrophobic',
         'Carbonyl', 'Polar', 'Weak Polar', 'Atom proximity', 'Vdw proximity', 'Interacting entities'
     ]
-    lig_cons = arpeggio_df.loc[arpeggio_df["Interacting entities"] == "INTER"] # Selecting only the interactions between our specified atoms (i.e ligands) and other selections
+    lig_cons = arpeggio_df.loc[arpeggio_df["Interacting entities"] == "INTER"].copy() # Selecting only the interactions between our specified atoms (i.e ligands) and other selections
     lig_cons = lig_cons.sort_values(by = ["Atom_1"])
     
     split_atom1 = lig_cons.Atom_1.str.split("/", expand = True) # splits atom1 column into three new columns: chain, resnum and atom
@@ -713,8 +714,8 @@ def ligand_to_atom2(lig_cons_split, lig):
         'Hydrophobic', 'Carbonyl', 'Polar', 'Weak Polar','Atom proximity',
         'Vdw proximity', 'Interacting entities'
     ]
-    lig_is_atom1 = lig_cons_split[lig_cons_split["ResName (Atom1)"] == lig].sort_values("ResNum (Atom2)")
-    lig_is_atom2 = lig_cons_split[lig_cons_split["ResName (Atom2)"] == lig].sort_values("ResNum (Atom1)")
+    lig_is_atom1 = lig_cons_split[lig_cons_split["ResName (Atom1)"] == lig].copy().sort_values("ResNum (Atom2)")
+    lig_is_atom2 = lig_cons_split[lig_cons_split["ResName (Atom2)"] == lig].copy().sort_values("ResNum (Atom1)")
 
     lig_is_atom1.rename(columns = {
         'Chain (Atom1)': 'Chain (Atom2)', 'Chain (Atom2)': 'Chain (Atom1)',
@@ -888,7 +889,7 @@ def oc(oc_in, type_mat = "sim", method = oc_method, cut_t = oc_dist):
     """
     oc_out = oc_in.replace(".dis", "_{}_{}_cut_{}.ocout".format(type_mat, method, cut_t))
     args = [
-        "/homes/2394007/oc", type_mat, method, "id", "cut", str(cut_t),
+        oc_bin, type_mat, method, "id", "cut", str(cut_t),
         "ps", oc_out[:-6], "<", oc_in, ">", oc_out
     ]
     exit_code = os.system(" ".join(args))
@@ -1146,7 +1147,7 @@ def get_and_format_shenkin(shenkin, prot_cols, out = None):
     """
     DOC
     """
-    shenkin_filt = shenkin[shenkin.col.isin(prot_cols)]#.copy()
+    shenkin_filt = shenkin[shenkin.col.isin(prot_cols)].copy()
     shenkin_filt.index = range(1, len(shenkin_filt) + 1) # CONTAINS SHENKIN SCORE, OCCUPANCY/GAP PROPORTION OF CONSENSUS COLUMNS
     min_shenkin = min(shenkin_filt.shenkin)
     max_shenkin = max(shenkin_filt.shenkin)
@@ -1488,7 +1489,6 @@ def plot_binding_site(df, cons_col = "shenkin", color = "blue", thresholds = [30
     
     cbar = plt.colorbar()
     plt.clim(0,1)
-    cbar.ax.get_yaxis().labelpad = 15
     cbar.ax.set_ylabel('p-value', fontsize = 25)# rotation = 270)
     cbar.ax.tick_params(labelsize=20)
     cbar.set_ticks([n/10 for n in range(0, 11)])
@@ -1504,13 +1504,13 @@ def plot_binding_site(df, cons_col = "shenkin", color = "blue", thresholds = [30
                             xytext = (-20, 0), # distance from text to points (x,y)
                             ha = 'right',
                             fontsize = 17.5) # horizontal alignment can be left, right or center
-    plt.xlabel("Normalised Shenkin divergence score", fontsize = 22.5, labelpad = 15)
-    plt.ylabel("MES", fontsize = 22.5, labelpad = 15)
+    plt.xlabel("Normalised Shenkin divergence score", fontsize = 22.5)
+    plt.ylabel("MES", fontsize = 22.5)
     
     if pltitle != None:
-        plt.title(pltitle, fontsize = 25, pad = 20)
+        plt.title(pltitle, fontsize = 25)
         
-    plt.tick_params(axis = 'both' , which = 'major', pad = 7.5, width = 1.9, length = 6.25, labelsize = 20)
+    plt.tick_params(axis = 'both' , which = 'major', width = 1.9, length = 6.25, labelsize = 20)
     ylims_round = [round(ylim, 1) for ylim in ylims]
     lower_yticks = list(np.arange(ylims_round[0], 0, 0.25))
     higher_yticks = list(np.arange(lower_yticks[-1], ylims_round[1], 0.25))
@@ -1552,8 +1552,8 @@ def plot_prot_bss(df, prot, bs_color_dict, out = None, show = False, override = 
     plt.xticks(range(0, 105, 5))
     plt.xlabel("Normalised Shenkin divergence score", fontsize = 20)
     plt.ylabel("MES", fontsize = 20)
-    plt.title(prot, fontsize = 25, pad = 15)
-    plt.tick_params(axis= 'both' , which = 'major', pad = 6, width = 1.5, length = 5, labelsize = 14)
+    plt.title(prot, fontsize = 25)
+    plt.tick_params(axis= 'both' , which = 'major', width = 1.5, length = 5, labelsize = 14)
     fig_leg = []
     for bs_id in bs_ids:
         fig_leg.append(mpatches.Patch(color = bs_color_dict[bs_id], label = bs_id))
