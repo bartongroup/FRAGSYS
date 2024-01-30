@@ -189,6 +189,16 @@ wget https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase
 gzip -d uniprot_sprot.fasta.gz
 ```
 
+### Downloading gnoMAD v2.1
+
+This is the database used for our analysis, but can be changed according to the user purposes, e.g. v > 2.1. What is important is to add the correct path in the [fragsys configuration file](fragsys_config.txt). To download gnomAD v2.1, follow the next steps.
+```
+# download gnomAD Exomves vcf (large file 58GB)
+wget https://storage.googleapis.com/gcp-public-data--gnomad/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.vcf.bgz
+```
+
+For more information, refer to [gnomAD](https://gnomad.broadinstitute.org/).
+
 ### Configuration of FRAGSYS
 
 Head to the [fragsys configuration file](fragsys_config.txt) and edit the following fields. Note: not all of them need changing, just showing the ones that do.
