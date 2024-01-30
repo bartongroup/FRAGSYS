@@ -188,7 +188,7 @@ def main(main_dir, prot, input_df):
                 pass
             else:
                 dssp_data = run_dssp(struc, supp_pdbs_subdir, dssp_subdir)
-            input_sifts = os.path.join(os.getcwd(), ".prointvar/sifts", "{}.xml".format(pdb_id))
+            input_sifts = os.path.join(cfg.db_root, cfg.db_sifts, "{}.xml".format(pdb_id))
             input_sifts_moved = os.path.join(sifts_subdir, "{}.xml".format(pdb_id))
             if os.path.isfile(input_sifts_moved):
                 pass
