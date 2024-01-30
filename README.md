@@ -19,14 +19,14 @@ For another example, check this other [`notebook`](https://github.com/bartongrou
 For each structural segment of each protein in `panddas`, **FRAGSYS** will:
 1. Download biological assemblies from [PDBe](https://www.ebi.ac.uk/pdbe/)
 2. Structurally superimpose structures using [STAMP](http://www.compbio.dundee.ac.uk/downloads/stamp/)
-3. Get accessibility and secondary structure elements from [DSSP](https://swift.cmbi.umcn.nl/gv/dssp/) via [ProIntVar](https://github.com/bartongroup/prointvar)<sup>*</sup>
+3. Get accessibility and secondary structure elements from [DSSP](https://swift.cmbi.umcn.nl/gv/dssp/) via [ProIntVar](https://github.com/bartongroup/prointvar)
 4. Mapping PDB residues to UniProt using [SIFTS](https://www.ebi.ac.uk/pdbe/docs/sifts/)
 5. Obtain protein-ligand interactions running [Arpeggio](https://github.com/harryjubb/arpeggio)
 6. Cluster ligands into binding sites using [OC](http://www.compbio.dundee.ac.uk/downloads/oc/)
 7. Generate visualisation scripts for [UCSF Chimera](https://www.cgl.ucsf.edu/chimera/)
 8. Generate multiple sequence alignment (MSA) with [jackhmmer](http://hmmer.org/)
 9. Calculate Shenkin divergence score [[1](https://doi.org/10.1002/prot.340110408)]
-10. Calculate missense enrichment scores with [VarAlign](https://github.com/bartongroup/SM_varalign)<sup>*</sup>
+10. Calculate missense enrichment scores with [VarAlign](https://github.com/bartongroup/SM_varalign)
 
 The final output of the pipeline consists of multiple tables for each structural segment collating the results from the different steps of the analysis for each residue, and for the defined ligand binding sites. These data include relative solvent accessibility (RSA), angles, secondary structure, PDB/UniProt residue number, alignment column, column occupancy, divergence score, missense enrichment score, p-value, etc.
 
@@ -69,7 +69,7 @@ Apart from the [INSTALL](INSTALL.md), [LICENSE](LICENSE) and [README](README.md)
 There are 6 directories in this repository.
 
 ### [`scripts`](scripts/clean_pdb.py)
-This environment contains a python script (scripts/clean_pdb.py) grabbed from [here](https://github.com/harryjubb/pdbtools/blob/master/clean_pdb.py). This script will be used to pre-process the PDB files before running Arpeggio on them.
+This environment contains [clean_pdb.py](scriptscripts/clean_pdb.py), a python script grabbed from [here](https://github.com/harryjubb/pdbtools/blob/master/clean_pdb.py). This script will be used to pre-process the PDB files before running Arpeggio on them.
 
 ### [`envs`](envs/)
 The envs folder contains three .yml files describing the necessary packages and dependencies for the different parts of the pipeline and analysis.
