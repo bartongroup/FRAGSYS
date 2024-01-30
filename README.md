@@ -189,7 +189,7 @@ wget https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase
 gzip -d uniprot_sprot.fasta.gz
 ```
 
-### Downloading gnoMAD v2.1
+### Downloading gnomAD v2.1
 
 This is the database used for our analysis, but can be changed according to the user purposes, e.g. v > 2.1. What is important is to add the correct path in the [fragsys configuration file](fragsys_config.txt). To download gnomAD v2.1, follow the next steps.
 ```
@@ -198,6 +198,8 @@ wget https://storage.googleapis.com/gcp-public-data--gnomad/release/2.1.1/vcf/ex
 ```
 
 For more information, refer to [gnomAD](https://gnomad.broadinstitute.org/).
+
+After downloading gnomAD, it is required to run VEP on it, as VarAlign uses its annotations. Information on how to do so [here](https://www.ensembl.org/info/docs/tools/vep/script/vep_options.html).
 
 ### Configuration of FRAGSYS
 
@@ -209,10 +211,10 @@ stamp_bin = ./../stamp.4.4.2/bin/operative_system/stamp # change operative_syst
 transform_bin = ./../stamp.4.4.2/bin/operative_system/transform # change operative_system here
 clean_pdb_python_bin = /path/to/miniconda/envs/arpeggio_env/bin/python
 arpeggio_python_bin = /path/to/miniconda/envs/arpeggio_env/bin/python
-arpeggio_bin = /path/2394007/SM_VarAlign/arpeggio/arpeggio.py
+arpeggio_bin = ./../arpeggio/arpeggio.py
 
 [dbs]
-gnomad_vcf = /homes/smacgowan/NOBACK/resources/gnomad/gnomad.exomes.r2.0.1.sites.vcf.gz # THIS NEEDS FIXING
+gnomad_vcf = /path/to/your/VEP/annotated/gnomAD/in/vcf/format
 swissprot = ./../uniprot_sprot.fasta
 ```
 
