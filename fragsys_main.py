@@ -358,10 +358,6 @@ def main(main_dir, prot, input_df):
         if len(aln_info_human) > 0:
             print("There are {} HUMAN sequences in the MSA".format(len(aln_info_human)))
         
-        #if len(aln_info_human) == 0: #THERE ARE NOT ANY HUMAN HOMOLOGUES FOR THE TARGET PROTEIN
-        #    print("There are {} sequences in the MSA for {} {}. Skipping to next protein sequence".format(len(aln_info_human), prot, subdir))
-        #    continue
-            
             human_hits_msa = os.path.join(hits_aln_rf[:-4] + "_human.sto")
             if os.path.isfile(human_hits_msa):
                 pass
@@ -412,8 +408,6 @@ def main(main_dir, prot, input_df):
             pass
         
         aln_ids = list(set([seqid[0] for seqid in indexed_mapping_table.index.tolist() if "P0DTD1" in seqid[0]])) # THIS IS EMPTY IF QUERY SEQUENCE IS NOT FOUND
-        
-        print(aln_ids)
 
         mapped_data = merge_shenkin_df_and_mapping(shenkin_filt, indexed_mapping_table, aln_ids) #does it need to be only human?
         
@@ -442,7 +436,7 @@ def main(main_dir, prot, input_df):
             fragsys_df = add_bs_info2df(bs_sig_cols, all_contact_variations, fragsys_df_path)
             print("Fragsys results dataframe was created and saved successfully!")
     
-        #totals = get_totals(mapped_data, prot, sifts_subdir)
+        totals = get_totals(mapped_data, prot, sifts_subdir)
 
         ### BINDING SITE PLOTTING SECION ###
     
@@ -457,39 +451,10 @@ def main(main_dir, prot, input_df):
         df_prot_miss = pd.read_csv(miss_df_out)
         df_prot_miss = df_prot_miss[df_prot_miss.occ > 0]
         mes_sgc_df_filt = mes_sgc_df[(mes_sgc_df.vars != 0) & (mes_sgc_df.occ != 0) & (mes_sgc_df.shenkin_ci != 0)&(mes_sgc_df.number_bs_res > 1)] # filter df to get rid of sites with 0 variants and other anomalies
-        sample_colors = list(itertools.islice(rgbs(), 200)) # new_colours
-        bs_color_dict = {}
-        for i, color in enumerate(sample_colors):
-            bs_color_dict["BS"+str(i)] = color
-
-        mes_sgc_df_filt["bs_color"] = mes_sgc_df_filt.bs_id.map(bs_color_dict) # add binding site colour column
-
-        for k, v in bs_unique_res.items():
-            sorted_bs_res = sorted(fragsys_df[fragsys_df.UniProt_ResNum.isin(v)].drop_duplicates("UniProt_ResNum").alignment_column.tolist())
-            plot_binding_site(
-                df_prot_miss[df_prot_miss.col.isin(sorted_bs_res)],
-                cons_col = "rel_norm_shenkin",
-                error = False,
-                thresholds = [25, 75],
-                color = [bs_color_dict["BS"+str(k)]],
-                ylims = [fragsys_df.log_oddsratio.min() - 0.1, fragsys_df.log_oddsratio.max() + 0.1], 
-                pltitle = "BS{} of {}".format(str(k), prot),
-                out = os.path.join(figs_subdir, "{}_{}_BS{}.png".format(prot, subdir,str(k))),
-                show = False
-        )
         
         bs_ids = mes_sgc_df_filt.bs_id.unique().tolist()
-        
-        out = os.path.join(figs_subdir, "{}_{}_bss.png".format(prot, subdir))
-
-        plot_prot_bss(
-            mes_sgc_df_filt, prot,
-            bs_color_dict,
-            out, show = False, override = False
-        )
 
         get_overall_stats(wd, prot, subdir, lig_data_path, bs_ids, varalign_subdir, totals)
-    
         
         print("Fragsys has finished running for group {} of {}!".format(subdir, prot))
 

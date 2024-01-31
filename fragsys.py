@@ -1368,8 +1368,16 @@ def get_totals(mapped_data, prot, sifts_dir):
     coords = get_seq_range(sifts_dir, prot)
     mapped_data_filt = mapped_data[mapped_data.UniProt_ResNum.isin(range(coords[0], coords[1]+1))]
     mapped_data_filt = mapped_data_filt.drop_duplicates("alignment_column")
-    total_vars = mapped_data_filt.variants.sum()
-    total_occ = mapped_data_filt.human_occ.sum()
+    try:
+        total_vars = mapped_data_filt.variants.sum()
+    except:
+        total_vars = 0
+        print("There were 0 variants for {} in {}".format(prot, coords))
+    try:
+        total_occ = mapped_data_filt.human_occ.sum()
+        print("There were 0 human residues for {} in {}".format(prot, coords))
+    except:
+        total_occ = 0
     return (total_vars, total_occ)
 
 def get_seq_range(sifts_dir, prot):
@@ -1394,8 +1402,16 @@ def create_binding_site_df(struvarpi_results):
     total_vars, total_occ = struvarpi_results[1]                               #variants an occupancy of whole protein structure
     for bs_label in bs_labels: # loops through all defined binding sites in protein structure
         total_bs += 1
-        bs_occ = struvarpi_df[(struvarpi_df[bs_label] == 1)].drop_duplicates(subset = ["alignment_column"]).human_occ.sum() # human alignment occupancy of columns forming bs
-        bs_vars = struvarpi_df[(struvarpi_df[bs_label] == 1)].drop_duplicates(subset = ["alignment_column"]).variants.sum() # human missense variants in columns forming bs
+        try:
+            bs_occ = struvarpi_df[(struvarpi_df[bs_label] == 1)].drop_duplicates(subset = ["alignment_column"]).human_occ.sum() # human alignment occupancy of columns forming bs
+        except:
+            bs_occ = 0
+            print("There were 0 Human residues for {} ".format(bs_label))
+        try:
+            bs_vars = struvarpi_df[(struvarpi_df[bs_label] == 1)].drop_duplicates(subset = ["alignment_column"]).variants.sum() # human missense variants in columns forming bs
+        except:
+            bs_vars = 0
+            print("There were 0 Human variants for {} ".format(bs_label))
         shenkins = struvarpi_df[(struvarpi_df[bs_label] == 1)].drop_duplicates(subset = ["UniProt_ResNum"]).rel_norm_shenkin.tolist() #shenkins of columns forming bs
         rest_occ = total_occ - bs_occ
         rest_vars = total_vars - bs_vars
@@ -1588,8 +1604,14 @@ def get_overall_stats(wd, prot, subdir, lig_data_path, bs_ids, varalign_dir, tot
     human_msa_path = os.path.join(varalign_dir, "{}_{}_rf_human.sto".format(prot, subdir))
     variants_msa_path = os.path.join(varalign_dir, "{}_{}_rf_human_missense_variants_seqs.sto".format(prot, subdir))
     full_msa_len = len([rec.id for rec in Bio.SeqIO.parse(full_msa_path, "stockholm")])
-    human_msa_len = len([rec.id for rec in Bio.SeqIO.parse(human_msa_path, "stockholm")])
-    variants_msa_len = len([rec.id for rec in Bio.SeqIO.parse(variants_msa_path, "stockholm")])
+    try:
+        human_msa_len = len([rec.id for rec in Bio.SeqIO.parse(human_msa_path, "stockholm")])
+    except:
+        human_msa_len = 0
+    try:
+        variants_msa_len = len([rec.id for rec in Bio.SeqIO.parse(variants_msa_path, "stockholm")])
+    except:
+        variants_msa_len = 0
     sum_df_out = os.path.join(wd, "{}_{}_results.csv").format(prot, subdir)
     if os.path.isfile(sum_df_out):
         pass
