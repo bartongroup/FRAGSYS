@@ -14,16 +14,13 @@ The following instructions are to install OC. For more information refer to the 
 
 ```
 # download OC
-wget https://www.compbio.dundee.ac.uk/downloads/oc/oc-2.1a.tar.gz
+wget https://www.compbio.dundee.ac.uk/downloads/oc/oc-2.1b.tar.gz
 
 # decompress OC
-tar -xzvf oc-2.1a.tar.gz 
+tar -xzvf oc-2.1b.tar.gz 
 
 # change directory to OC main directory
-cd oc-2.1a
-
-# change getline function name
-sed -i '1282s/getline/readline/; 1290s/getline/readline/; 1338s/getline/readline/' oc.c
+cd oc-2.1b
 
 # compile OC
 gcc -o oc -O3  oc.c gjutil.c gjtimes.c -I./gjutil -I./ -lm
@@ -173,7 +170,7 @@ ProIntVar-config-setup new_config.ini
 
 This is the database used for our analysis, but can be changed according to the user purposes, e.g. TrEMBL. What is important is to add the correct path in the [fragsys configuration file](fragsys_config.txt). To download SwissProt, follow the next steps.
 ```
-# download SwissProt in fasta format
+# download SwissProt in fasta format (92MB)
 wget https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz
 
 # decrompress the file
