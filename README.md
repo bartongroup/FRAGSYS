@@ -32,6 +32,8 @@ The final output of the pipeline consists of multiple tables for each structural
 
 These tables are concatenated into master tables, with data for all 37 structual segments, which form the input for the analyses carried out in the [`analysis`](analysis/) notebooks.
 
+Refer to notebook [15](analysis/15_ML_predicting_rsa_labels.ipynb) to predict RSA cluster labels for your binding sites of interest.
+
 ## Dependencies
 The pipeline, as well as the whole of the analysis are run in an interactive manner in a series of jupyter notebooks, found in the [`analysis`](analysis/) folder.
 
