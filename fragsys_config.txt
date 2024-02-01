@@ -2,7 +2,7 @@
 
 [binaries]
 dssp_bin = /path/to/miniconda/envs/dssp_env/bin/mkdssp
-oc_bin = ./../oc-2.1a/oc
+oc_bin = ./../oc-2.1b/oc
 stamp_bin = ./../stamp.4.4.2/bin/operative_system/stamp
 transform_bin = ./../stamp.4.4.2/bin/operative_system/transform
 clean_pdb_python_bin = /path/to/miniconda/envs/arpeggio_env/bin/python
