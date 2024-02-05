@@ -164,6 +164,9 @@ ProIntVar-config-setup new_config.ini
 # python_exe = /path/to/anaconda/envs/arpeggio/bin/python
 # python_path = /path/to/anaconda/envs/arpeggio/python/lib/site-packages/
 # dssp_bin = /path/to/anaconda/envs/bin/mkdssp
+
+# Update the settings according to user preferences and push them
+ProIntVar-config-load new_config.ini
 ```
 
 ## Downloading SwissProt
